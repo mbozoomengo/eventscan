@@ -21,14 +21,17 @@ export default function DashboardPage() {
       if (!user) { router.replace('/login'); return }
       setUser(user)
 
-      const [{ data: profile }, { data: events }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('events').select('*').eq('owner_id', user.id).order('date', { ascending: false }).limit(10)
-      ])
-
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(profile)
-      setEvents(events ?? [])
 
+      // Rediriger les scanners vers leur page dédiée
+      if (profile?.role === 'scanner') { router.replace('/scanner'); return }
+
+      const { data: events } = await supabase
+        .from('events').select('*').eq('owner_id', user.id)
+        .order('date', { ascending: false }).limit(10)
+
+      setEvents(events ?? [])
       const eventIds = (events ?? []).map((e: any) => e.id)
       if (eventIds.length > 0) {
         const [{ count: guests }, { count: checked }] = await Promise.all([
@@ -36,8 +39,6 @@ export default function DashboardPage() {
           supabase.from('guests').select('*', { count: 'exact', head: true }).in('event_id', eventIds).eq('checked_in', true)
         ])
         setStats({ events: events?.length ?? 0, guests: guests ?? 0, checked: checked ?? 0 })
-      } else {
-        setStats({ events: 0, guests: 0, checked: 0 })
       }
       setLoading(false)
     }
@@ -51,10 +52,7 @@ export default function DashboardPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-        <p className="text-sm text-gray-500">Chargement...</p>
-      </div>
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
