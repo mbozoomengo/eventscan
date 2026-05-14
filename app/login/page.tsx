@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { QrCode, Mail, Lock, Loader2 } from 'lucide-react'
 
@@ -10,7 +9,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,14 +24,13 @@ export default function LoginPage() {
     }
 
     toast.success('Connexion réussie')
-    router.push('/dashboard')
-    router.refresh()
+    // Full page reload pour que le proxy détecte la session
+    window.location.href = '/dashboard'
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center p-4">
       <div className="card w-full max-w-md p-8">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl mb-4">
             <QrCode className="w-8 h-8 text-white" />
@@ -42,7 +39,6 @@ export default function LoginPage() {
           <p className="text-gray-500 text-sm mt-1">Gestion d&apos;événements & QR codes</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="label">Email</label>
