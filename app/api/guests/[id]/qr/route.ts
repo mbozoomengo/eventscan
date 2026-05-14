@@ -4,21 +4,21 @@ import QRCode from 'qrcode'
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const supabase = await createClient()
 
   const { data: guest, error } = await supabase
     .from('guests')
     .select('id, full_name, qr_token, event_id')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !guest) {
     return NextResponse.json({ error: 'Invité introuvable' }, { status: 404 })
   }
 
-  // Générer QR code en PNG (buffer)
   const png = await QRCode.toBuffer(guest.qr_token, {
     type: 'png',
     width: 300,

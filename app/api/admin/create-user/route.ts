@@ -1,9 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  // Vérifier que l'appelant est admin
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -12,13 +10,15 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
 
   if (profile?.role !== 'admin') {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
   }
 
-  // Créer l'utilisateur avec le service role
   const { email, password, full_name, role } = await request.json()
 
   if (!email || !password || !full_name) {
@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
   }
 
   const adminSupabase = await createAdminClient()
-
   const { data, error } = await adminSupabase.auth.admin.createUser({
     email,
     password,
