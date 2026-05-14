@@ -18,18 +18,18 @@ export default function NewEventPage() {
     setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { window.location.href = '/login'; return }
 
     const { error } = await supabase.from('events').insert({
       name: form.name,
-      description: form.description,
-      date: form.date,
-      location: form.location,
+      description: form.description || null,
+      date: new Date(form.date).toISOString(),
+      location: form.location || null,
       owner_id: user.id,
     })
 
     if (error) {
-      toast.error('Erreur lors de la création')
+      toast.error(`Erreur: ${error.message}`)
       setLoading(false)
       return
     }
@@ -53,55 +53,29 @@ export default function NewEventPage() {
         <div className="card p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Nom de l&apos;événement *</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Mariage de Jean & Marie"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                required
-              />
+              <label className="label">Nom *</label>
+              <input type="text" className="input" placeholder="Mariage de Jean & Marie"
+                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
             </div>
-
             <div>
               <label className="label">Date et heure *</label>
-              <input
-                type="datetime-local"
-                className="input"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
-                required
-              />
+              <input type="datetime-local" className="input"
+                value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
             </div>
-
             <div>
               <label className="label">Lieu</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Hôtel Hilton, Yaoundé"
-                value={form.location}
-                onChange={e => setForm({ ...form, location: e.target.value })}
-              />
+              <input type="text" className="input" placeholder="Hôtel Hilton, Yaoundé"
+                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
             </div>
-
             <div>
               <label className="label">Description</label>
-              <textarea
-                className="input min-h-[80px] resize-none"
-                placeholder="Description optionnelle..."
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-              />
+              <textarea className="input min-h-[80px] resize-none" placeholder="Optionnel..."
+                value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
             </div>
-
             <div className="flex gap-3 pt-2">
-              <Link href="/dashboard" className="btn-secondary flex-1 text-center">
-                Annuler
-              </Link>
+              <Link href="/dashboard" className="btn-secondary flex-1 text-center">Annuler</Link>
               <button type="submit" disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Création...</> : 'Créer l\'événement'}
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Création...</> : 'Créer'}
               </button>
             </div>
           </form>
