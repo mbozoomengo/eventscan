@@ -41,9 +41,14 @@ export default function AdminPage() {
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
+    // Envoyer le JWT dans le header pour que l'API route puisse vérifier l'identité
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/admin/create-user', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
       body: JSON.stringify(form)
     })
     const data = await res.json()
@@ -84,14 +89,12 @@ export default function AdminPage() {
             <div><p className="text-xl font-bold">{stats.scans}</p><p className="text-xs text-gray-500">Scans</p></div>
           </div>
         </div>
-
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Utilisateurs</h2>
           <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2 text-sm">
             <UserPlus className="w-4 h-4" /> Créer un compte
           </button>
         </div>
-
         {showForm && (
           <div className="card p-5 mb-4 border-orange-200 bg-orange-50">
             <h3 className="font-medium text-gray-900 mb-4">Nouveau compte</h3>
@@ -125,7 +128,6 @@ export default function AdminPage() {
             </form>
           </div>
         )}
-
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
@@ -136,9 +138,7 @@ export default function AdminPage() {
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{u.full_name || '-'}</td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <span className={u.role === 'admin' ? 'badge-error' : u.role === 'scanner' ? 'badge-success' : 'badge-warning'}>{u.role}</span>
-                  </td>
+                  <td className="px-4 py-3"><span className={u.role === 'admin' ? 'badge-error' : u.role === 'scanner' ? 'badge-success' : 'badge-warning'}>{u.role}</span></td>
                   <td className="px-4 py-3 text-gray-500">{new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
                 </tr>
               ))}
