@@ -9,10 +9,11 @@ import toast from 'react-hot-toast'
 
 export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [stats, setStats] = useState({ events: 0, scans: 0 })
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'organizer' })
+  const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
   const [creating, setCreating] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -23,12 +24,14 @@ export default function AdminPage() {
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
-      const [{ data: us }, { count: ev }, { count: sc }] = await Promise.all([
+      const [{ data: us }, { data: evs }, { count: ev }, { count: sc }] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('events').select('id, name').order('date', { ascending: false }),
         supabase.from('events').select('*', { count: 'exact', head: true }),
         supabase.from('scan_logs').select('*', { count: 'exact', head: true }).eq('status', 'success')
       ])
       setUsers(us ?? [])
+      setEvents(evs ?? [])
       setStats({ events: ev ?? 0, scans: sc ?? 0 })
       setLoading(false)
     }
@@ -47,7 +50,7 @@ export default function AdminPage() {
     if (!res.ok) { toast.error(data.error || 'Erreur'); setCreating(false); return }
     toast.success(`Compte créé pour ${form.email}`)
     setShowForm(false)
-    setForm({ email: '', full_name: '', password: '', role: 'organizer' })
+    setForm({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
     window.location.reload()
   }
 
@@ -81,19 +84,38 @@ export default function AdminPage() {
             <div><p className="text-xl font-bold">{stats.scans}</p><p className="text-xs text-gray-500">Scans</p></div>
           </div>
         </div>
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Utilisateurs</h2>
           <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2 text-sm">
             <UserPlus className="w-4 h-4" /> Créer un compte
           </button>
         </div>
+
         {showForm && (
           <div className="card p-5 mb-4 border-orange-200 bg-orange-50">
+            <h3 className="font-medium text-gray-900 mb-4">Nouveau compte</h3>
             <form onSubmit={createUser} className="grid grid-cols-2 gap-3">
-              <div><label className="label">Nom</label><input type="text" className="input" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} required /></div>
+              <div><label className="label">Nom complet</label><input type="text" className="input" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} required /></div>
               <div><label className="label">Email</label><input type="email" className="input" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required /></div>
               <div><label className="label">Mot de passe</label><input type="password" className="input" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required minLength={6} /></div>
-              <div><label className="label">Rôle</label><select className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value})}><option value="organizer">Organisateur</option><option value="admin">Admin</option></select></div>
+              <div>
+                <label className="label">Rôle</label>
+                <select className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value, event_id: ''})}>
+                  <option value="organizer">Organisateur</option>
+                  <option value="scanner">Scanner (accès événement unique)</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              {form.role === 'scanner' && (
+                <div className="col-span-2">
+                  <label className="label">Événement assigné *</label>
+                  <select className="input" value={form.event_id} onChange={e => setForm({...form, event_id: e.target.value})} required>
+                    <option value="">-- Choisir un événement --</option>
+                    {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="col-span-2 flex gap-3 justify-end">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary text-sm">Annuler</button>
                 <button type="submit" disabled={creating} className="btn-primary flex items-center gap-2 text-sm">
@@ -103,19 +125,20 @@ export default function AdminPage() {
             </form>
           </div>
         )}
+
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
-              <tr>
-                {['Nom','Email','Rôle','Créé le'].map(h => <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 font-medium">{h}</th>)}
-              </tr>
+              <tr>{['Nom','Email','Rôle','Créé le'].map(h => <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 font-medium">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {users.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{u.full_name || '-'}</td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3"><span className={u.role === 'admin' ? 'badge-error' : 'badge-warning'}>{u.role}</span></td>
+                  <td className="px-4 py-3">
+                    <span className={u.role === 'admin' ? 'badge-error' : u.role === 'scanner' ? 'badge-success' : 'badge-warning'}>{u.role}</span>
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
                 </tr>
               ))}
