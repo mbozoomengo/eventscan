@@ -1,13 +1,20 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: NextRequest) {
   const token = request.headers.get('Authorization')?.replace('Bearer ', '')
   if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
+  const supabase = adminClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -16,26 +23,12 @@ export async function POST(request: NextRequest) {
 
   if (action === 'set_organizer') {
     if (!event_id || !organizer_id) return NextResponse.json({ error: 'Champs manquants' }, { status: 400 })
-
-    // Vérifier que l'organisateur n'est pas déjà assigné ailleurs
     const { data: existing } = await supabase
-      .from('event_team')
-      .select('event_id')
-      .eq('user_id', organizer_id)
-      .eq('role', 'organizer')
-      .neq('event_id', event_id)
+      .from('event_team').select('event_id')
+      .eq('user_id', organizer_id).eq('role', 'organizer').neq('event_id', event_id)
       .maybeSingle()
-    if (existing) {
-      return NextResponse.json(
-        { error: 'Cet organisateur est déjà assigné à un autre événement' },
-        { status: 409 }
-      )
-    }
-
-    // Retirer l'ancien organisateur de cet event si nécessaire
+    if (existing) return NextResponse.json({ error: 'Organisateur déjà assigné ailleurs' }, { status: 409 })
     await supabase.from('event_team').delete().eq('event_id', event_id).eq('role', 'organizer')
-
-    // Insérer le nouvel organisateur
     const { error } = await supabase.from('event_team').insert({ event_id, user_id: organizer_id, role: 'organizer' })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
@@ -43,16 +36,9 @@ export async function POST(request: NextRequest) {
 
   if (action === 'add_scanner') {
     if (!event_id || !scanner_id) return NextResponse.json({ error: 'Champs manquants' }, { status: 400 })
-
-    const { count } = await supabase
-      .from('event_team')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', event_id)
-      .eq('role', 'scanner')
-    if ((count ?? 0) >= 10) {
-      return NextResponse.json({ error: 'Maximum 10 scanners par événement' }, { status: 400 })
-    }
-
+    const { count } = await supabase.from('event_team').select('*', { count: 'exact', head: true })
+      .eq('event_id', event_id).eq('role', 'scanner')
+    if ((count ?? 0) >= 10) return NextResponse.json({ error: 'Maximum 10 scanners' }, { status: 400 })
     const { error } = await supabase.from('event_team').insert({ event_id, user_id: scanner_id, role: 'scanner' })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })

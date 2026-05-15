@@ -1,5 +1,5 @@
 'use client'
-import { use, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -14,8 +14,8 @@ function Spin() {
   )
 }
 
-export default function AdminEventDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function AdminEventDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params
   const [event, setEvent] = useState<any>(null)
   const [team, setTeam] = useState<{ organizer: any | null; scanners: any[] }>({ organizer: null, scanners: [] })
   const [allOrganizers, setAllOrganizers] = useState<any[]>([])
@@ -56,7 +56,6 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
     const scans = td.filter((t: any) => t.role === 'scanner')
     setTeam({ organizer: org, scanners: scans })
 
-    // Filter out organizers already assigned to another event
     const { data: assignedOrgs } = await supabase
       .from('event_team').select('user_id').eq('role', 'organizer').neq('event_id', id)
     const assignedIds = new Set((assignedOrgs ?? []).map((a: any) => a.user_id))
@@ -131,7 +130,6 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <p className="text-2xl font-bold">{stats.guests}</p>
@@ -143,13 +141,11 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* Team */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
         <h2 className="font-semibold mb-5 flex items-center gap-2">
           <Users className="w-4 h-4" /> Équipe
         </h2>
 
-        {/* Organizer */}
         <div className="mb-5">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Organisateur</p>
           {team.organizer ? (
@@ -168,9 +164,9 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
               <select
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                 value={selectedOrg} onChange={e => setSelectedOrg(e.target.value)}>
-                <option value="">-- Sélectionner un organisateur --</option>
+                <option value="">— Sélectionner un organisateur —</option>
                 {allOrganizers.map(o => (
-                  <option key={o.id} value={o.id}>{o.full_name} ({o.email})</option>
+                  <option key={o.id} value={o.id}>{o.full_name || o.email} ({o.email})</option>
                 ))}
               </select>
               <button onClick={assignOrganizer} disabled={!selectedOrg || saving}
@@ -182,7 +178,6 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
           )}
         </div>
 
-        {/* Scanners */}
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
             Scanners ({team.scanners.length}/10)
@@ -214,9 +209,9 @@ export default function AdminEventDetailPage({ params }: { params: Promise<{ id:
               <select
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                 value={selectedScanner} onChange={e => setSelectedScanner(e.target.value)}>
-                <option value="">-- Ajouter un scanner --</option>
+                <option value="">— Ajouter un scanner —</option>
                 {allScanners.map(s => (
-                  <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>
+                  <option key={s.id} value={s.id}>{s.full_name || s.email} ({s.email})</option>
                 ))}
               </select>
               <button onClick={addScanner} disabled={!selectedScanner || saving}
