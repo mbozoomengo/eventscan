@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { QrCode, Mail, Lock, Loader2 } from 'lucide-react'
@@ -11,18 +10,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
-  const router = useRouter()
 
   // Redirige immédiatement si une session active existe déjà
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.replace('/dashboard')
+        window.location.href = '/dashboard'
       }
     }
     checkSession()
-  }, [router, supabase])
+  }, [supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,8 +35,8 @@ export default function LoginPage() {
     }
 
     toast.success('Connexion réussie')
-    router.push('/dashboard')
-    router.refresh()
+    // Rechargement complet pour que le middleware lise les cookies de session SSR
+    window.location.href = '/dashboard'
   }
 
   return (
