@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     folder.file(`${sanitize(guest.full_name)}.png`, png)
   }
 
-  const buffer = await zip.generateAsync({ type: 'nodebuffer' })
+  const buffer = await zip.generateAsync({ type: 'blob' })
 
   return new NextResponse(buffer, {
     headers: {
