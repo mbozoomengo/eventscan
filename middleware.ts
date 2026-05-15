@@ -22,17 +22,15 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   const path = request.nextUrl.pathname
-  const isProtected = path.startsWith('/dashboard') || path.startsWith('/admin')
 
-  // Non connecté → login
+  const isProtected = ['/dashboard', '/admin', '/organizer', '/scanner']
+    .some(p => path.startsWith(p))
+
   if (isProtected && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Connecté → pas besoin de vérifier le rôle ici (trop lent)
-  // La vérification admin se fait dans la page /admin elle-même
   if (path === '/login' && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
