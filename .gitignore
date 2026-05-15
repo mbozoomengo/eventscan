@@ -1,2 +1,31 @@
+# Dépendances (générées localement)
 node_modules
+/坚果云/
+.pnp
+.pnp.js
+
+# Environnement et Secrets (À NE JAMAIS PUSHER)
+.env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Dossiers de Build (générés par npm run build)
+.next/
+out/
+build/
+dist/
+
+# Caches et Outils de build
+.cache/
+.npm
+.eslintcache
+.stylelintcache
+
+# Fichiers système spécifiques
+.DS_Store
+Thumbs.db
+*.bak
+*.log
