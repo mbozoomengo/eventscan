@@ -10,23 +10,19 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
-
-  const { email, password, full_name, role = 'organizer' } = await request.json()
-  if (!email || !password || !full_name) {
-    return NextResponse.json({ error: 'Champs manquants (email, password, full_name)' }, { status: 400 })
-  }
-  if (!['admin', 'organizer', 'scanner'].includes(role)) {
-    return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
+  if (!['admin', 'organizer'].includes(profile?.role ?? '')) {
+    return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
   }
 
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name, role },
-  })
+  const { scan_log_id } = await request.json()
+  if (!scan_log_id) return NextResponse.json({ error: 'scan_log_id requis' }, { status: 400 })
+
+  const { error } = await supabase.from('scan_logs').update({
+    deleted: true,
+    deleted_at: new Date().toISOString(),
+    deleted_by: user.id,
+  }).eq('id', scan_log_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ user: data.user }, { status: 201 })
+  return NextResponse.json({ success: true })
 }
