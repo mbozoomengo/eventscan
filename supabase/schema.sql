@@ -127,12 +127,19 @@ create table public.scan_logs (
 
 alter table public.scan_logs enable row level security;
 
+-- FIX: l'organisateur est assigné via event_team (pas owner_id),
+-- la policy précédente bloquait silencieusement la lecture (200 OK, data vide)
 create policy "Organizers can view scan logs of their events"
   on public.scan_logs for all
   using (
     exists (
       select 1 from public.events
-      where id = event_id and owner_id = auth.uid()
+      where id = scan_logs.event_id and owner_id = auth.uid()
+    )
+    OR
+    exists (
+      select 1 from public.event_team
+      where event_id = scan_logs.event_id and user_id = auth.uid()
     )
   );
 
