@@ -1,16 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-// Type standard requis par le package @supabase/ssr
 type CookieToSet = {
   name: string;
   value: string;
   options: any;
 };
 
-export function createClient() {
-  // Correction Next.js 14 : cookies() n'est pas asynchrone
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,9 +30,8 @@ export function createClient() {
   );
 }
 
-export function createAdminClient() {
-  // Correction Next.js 14 : cookies() n'est pas asynchrone
-  const cookieStore = cookies();
+export async function createAdminClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

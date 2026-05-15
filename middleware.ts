@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Ajout du type explicite requis par TypeScript
 type CookieToSet = {
   name: string;
   value: string;
@@ -19,7 +18,6 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        // Typage du paramètre pour corriger l'erreur du build
         setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
@@ -33,9 +31,11 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // IMPORTANT: ne pas utiliser getSession() ici, getUser() fait une vérification serveur
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   const path = request.nextUrl.pathname;
 
   const isProtected = ["/dashboard", "/admin", "/organizer", "/scanner"].some(
@@ -43,18 +43,14 @@ export async function middleware(request: NextRequest) {
   );
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", path);
+    const response = NextResponse.redirect(loginUrl);
+    response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    return response;
   }
 
-  if (path === "/login" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Headers anti-cache pour toutes les réponses
-  supabaseResponse.headers.set(
-    "Cache-Control",
-    "no-cache, no-store, must-revalidate"
-  );
+  supabaseResponse.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
   supabaseResponse.headers.set("Pragma", "no-cache");
   supabaseResponse.headers.set("Expires", "0");
 
@@ -62,7 +58,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Exclut explicitement : fichiers statiques, images, favicon, api, invite, ET login
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|api|invite|login).*)",
   ],
