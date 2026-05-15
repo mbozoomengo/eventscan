@@ -1,20 +1,22 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { QrCode, LogOut } from 'lucide-react'
+import { QrCode, LogOut, Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const pathname = usePathname()
+  const [menuOpen, setMenuOpen] = useState(false)
   const logout = async () => { await supabase.auth.signOut(); window.location.href = '/login' }
 
   const nav = [
     { href: '/organizer',              label: 'Dashboard' },
-    { href: '/organizer/guests',       label: 'Invités' },
+    { href: '/organizer/guests',       label: 'Invites' },
     { href: '/organizer/scan',         label: 'Scanner' },
     { href: '/organizer/scan-history', label: 'Historique' },
-    { href: '/organizer/team',         label: 'Équipe' },
+    { href: '/organizer/team',         label: 'Equipe' },
   ]
 
   const isActive = (href: string) =>
@@ -30,23 +32,44 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
             </div>
             <span className="font-bold text-sm text-gray-900">EventScan</span>
           </div>
-          <nav className="flex items-center gap-1">
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
             {nav.map(({ href, label }) => (
               <Link key={href} href={href}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive(href)
-                    ? 'bg-orange-50 text-orange-600'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  isActive(href) ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}>{label}</Link>
             ))}
-            <button onClick={logout} title="Déconnexion"
+            <button onClick={logout} title="Deconnexion"
               className="ml-2 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
           </nav>
+
+          {/* Mobile hamburger */}
+          <button className="md:hidden p-2 text-gray-500" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
+
+        {/* Mobile menu */}
+        {menuOpen && (
+          <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
+            {nav.map(({ href, label }) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)}
+                className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive(href) ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'
+                }`}>{label}</Link>
+            ))}
+            <button onClick={logout}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-md w-full">
+              <LogOut className="w-4 h-4" /> Deconnexion
+            </button>
+          </div>
+        )}
       </header>
-      <main className="max-w-4xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-4xl mx-auto px-4 py-6">{children}</main>
     </div>
   )
 }

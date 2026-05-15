@@ -10,8 +10,8 @@ type ScanStatus = 'success' | 'already_scanned' | 'invalid'
 type ScanResult = { status: ScanStatus; guest?: any; first_scan_at?: string }
 
 const CONFIG: Record<ScanStatus, { icon: any; color: string; bg: string; label: string }> = {
-  success:        { icon: CheckCircle,  color: 'text-green-500',  bg: 'bg-green-50 border-green-200',   label: '✓ Bienvenue !' },
-  already_scanned:{ icon: AlertCircle,  color: 'text-orange-500', bg: 'bg-orange-50 border-orange-200',  label: 'Déjà enregistré' },
+  success:        { icon: CheckCircle,  color: 'text-green-500',  bg: 'bg-green-50 border-green-200',   label: 'Bienvenue !' },
+  already_scanned:{ icon: AlertCircle,  color: 'text-orange-500', bg: 'bg-orange-50 border-orange-200',  label: 'Deja enregistre' },
   invalid:        { icon: XCircle,      color: 'text-red-500',    bg: 'bg-red-50 border-red-200',        label: 'QR invalide' },
 }
 
@@ -38,10 +38,20 @@ export default function OrganizerScanPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (profile?.role !== 'organizer') { router.replace('/dashboard'); return }
+      // Admin et organizer peuvent scanner
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/dashboard'); return }
+
       const { data: teamEntry } = await supabase
-        .from('event_team').select('event_id, events(id, name)').eq('user_id', user.id).eq('role', 'organizer').single()
-      if (!teamEntry) { router.replace('/organizer'); return }
+        .from('event_team')
+        .select('event_id, events(id, name)')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!teamEntry) {
+        toast.error('Aucun evenement assigne')
+        router.replace(profile?.role === 'admin' ? '/admin' : '/organizer')
+        return
+      }
       const ev = (teamEntry as any).events
       setEvent(ev)
       refreshStats(ev.id)
@@ -67,7 +77,6 @@ export default function OrganizerScanPage() {
     }
     setResult(data)
     if (data.status === 'success') { toast.success(`Bienvenue, ${data.guest.full_name} !`); refreshStats(event.id) }
-    else if (data.status === 'already_scanned') toast.error('Déjà enregistré')
     setTimeout(() => { setResult(null); cooldown.current = false }, data.status === 'success' ? 4000 : 3000)
   }, [event, refreshStats])
 
@@ -77,7 +86,7 @@ export default function OrganizerScanPage() {
     try {
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 250 } }, handleScan, undefined)
       setScanning(true)
-    } catch { toast.error("Impossible d'accéder à la caméra") }
+    } catch { toast.error("Impossible d'acceder a la camera") }
   }, [handleScan])
 
   const stopScanner = useCallback(async () => {
@@ -89,28 +98,28 @@ export default function OrganizerScanPage() {
   const cfg = result ? CONFIG[result.status] : null
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-md mx-auto">
       {event && (
         <div className="text-center">
           <p className="font-semibold text-gray-900">{event.name}</p>
-          <p className="text-sm text-gray-500">{stats.checked}/{stats.total} entrées</p>
+          <p className="text-sm text-gray-500">{stats.checked}/{stats.total} entrees</p>
         </div>
       )}
 
-      <div id="qr-reader-organizer" className="rounded-xl overflow-hidden bg-gray-100" />
+      <div id="qr-reader-organizer" className="rounded-xl overflow-hidden bg-gray-100 w-full" />
 
       {!scanning ? (
         <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-10 text-center">
           <Camera className="w-14 h-14 text-gray-300 mx-auto mb-4" />
           <button onClick={startScanner}
-            className="bg-orange-500 text-white font-medium px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto">
-            <Camera className="w-4 h-4" /> Activer la caméra
+            className="bg-orange-500 text-white font-medium px-6 py-3 rounded-xl hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto text-sm">
+            <Camera className="w-4 h-4" /> Activer la camera
           </button>
         </div>
       ) : (
         <button onClick={stopScanner}
-          className="w-full border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-          <CameraOff className="w-4 h-4" /> Arrêter
+          className="w-full border border-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+          <CameraOff className="w-4 h-4" /> Arreter
         </button>
       )}
 
