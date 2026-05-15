@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Search, Trash2 } from 'lucide-react'
+import { Search, Trash2, RefreshCw } from 'lucide-react'
 
 function Spin() {
   return (
@@ -19,47 +19,66 @@ export default function ScanHistoryPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [eventId, setEventId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+  const eventIdRef = useRef<string | null>(null)
 
-  const loadScans = useCallback(async (evId: string) => {
+  const loadScans = useCallback(async (evId: string, silent = false) => {
+    if (!silent) setRefreshing(true)
     const { data } = await supabase
       .from('scan_logs')
-      .select('*, guests(full_name, category, table_name), profiles(full_name)')
+      .select('*, guests(full_name, category), profiles(full_name)')
       .eq('event_id', evId)
       .order('scanned_at', { ascending: false })
+      .limit(200)
     setScans(data ?? [])
+    if (!silent) setRefreshing(false)
   }, [supabase])
 
   useEffect(() => {
+    let channel: any = null
+    let interval: any = null
+
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/dashboard'); return }
+
       const { data: teamEntry } = await supabase
         .from('event_team').select('event_id').eq('user_id', user.id).single()
       if (!teamEntry) { router.replace('/organizer'); return }
+
       const evId = teamEntry.event_id
       setEventId(evId)
+      eventIdRef.current = evId
       await loadScans(evId)
       setLoading(false)
 
       // Realtime subscription
-      const channel = supabase
-        .channel('scan_logs_realtime')
+      channel = supabase
+        .channel(`scan_logs:${evId}`)
         .on('postgres_changes', {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'scan_logs',
           filter: `event_id=eq.${evId}`,
-        }, () => { loadScans(evId) })
+        }, () => { loadScans(evId, true) })
         .subscribe()
 
-      return () => { supabase.removeChannel(channel) }
+      // Polling fallback toutes les 5s
+      interval = setInterval(() => {
+        if (eventIdRef.current) loadScans(eventIdRef.current, true)
+      }, 5000)
     }
+
     init()
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+      if (interval) clearInterval(interval)
+    }
   }, [])
 
   useEffect(() => {
@@ -90,11 +109,22 @@ export default function ScanHistoryPage() {
 
   if (loading) return <Spin />
 
+  const successCount = scans.filter(s => s.status === 'success').length
+
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-xl font-bold">Historique des scans</h1>
-        <p className="text-sm text-gray-500">{filtered.length} entree(s)</p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-xl font-bold">Historique des scans</h1>
+          <p className="text-sm text-gray-500">{successCount} entrees valides sur {scans.length} total</p>
+        </div>
+        <button
+          onClick={() => eventId && loadScans(eventId)}
+          disabled={refreshing}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-orange-500 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Actualiser
+        </button>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -102,47 +132,47 @@ export default function ScanHistoryPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-            placeholder="Rechercher..."
+            placeholder="Rechercher par nom..."
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="all">Tous</option>
-          <option value="success">Succes</option>
-          <option value="already_scanned">Doublons</option>
+          <option value="all">Tous ({scans.length})</option>
+          <option value="success">Succes ({successCount})</option>
+          <option value="already_scanned">Doublons ({scans.filter(s => s.status === 'already_scanned').length})</option>
         </select>
       </div>
 
-      {/* Mobile: cartes empilees */}
-      <div className="block md:hidden space-y-3">
+      {/* Mobile cards */}
+      <div className="block md:hidden space-y-2">
         {filtered.map(s => (
           <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-medium text-sm">{(s.guests as any)?.full_name || '—'}</p>
                 {(s.guests as any)?.category && <p className="text-xs text-gray-400">{(s.guests as any).category}</p>}
+                <p className="text-xs text-gray-400 mt-1">{new Date(s.scanned_at).toLocaleString('fr-FR')}</p>
               </div>
-              <button onClick={() => deleteScan(s.id)} className="text-gray-300 hover:text-red-500 transition-colors ml-2">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                s.status === 'success' ? 'bg-green-100 text-green-700'
-                : s.status === 'already_scanned' ? 'bg-yellow-100 text-yellow-700'
-                : 'bg-red-100 text-red-700'
-              }`}>
-                {s.status === 'success' ? 'Succes' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
-              </span>
-              <span className="text-xs text-gray-400">{new Date(s.scanned_at).toLocaleString('fr-FR')}</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                  s.status === 'success' ? 'bg-green-100 text-green-700'
+                  : s.status === 'already_scanned' ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-red-100 text-red-700'
+                }`}>
+                  {s.status === 'success' ? 'Succes' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
+                </span>
+                <button onClick={() => deleteScan(s.id)} className="text-gray-300 hover:text-red-500">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
         {filtered.length === 0 && <p className="text-center text-gray-400 text-sm py-10">Aucun scan</p>}
       </div>
 
-      {/* Desktop: tableau */}
+      {/* Desktop table */}
       <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
