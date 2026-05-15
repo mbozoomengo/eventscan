@@ -25,11 +25,10 @@ export async function GET(
     margin: 2,
   })
 
-  return new NextResponse(png, {
-    headers: {
-      'Content-Type': 'image/png',
-      'Content-Disposition': `inline; filename="qr-${guest.full_name}.png"`,
-      'Cache-Control': 'public, max-age=86400',
-    },
-  })
+ return new NextResponse(new Uint8Array(png), {
+   headers: {
+     "Content-Type": "image/png",
+     "Content-Disposition": `inline; filename="qr-${guest.full_name}.png"`,
+   },
+ });
 }
