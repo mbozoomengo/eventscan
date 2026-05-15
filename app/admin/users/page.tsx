@@ -13,18 +13,26 @@ function Spin() {
   )
 }
 
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400'
+const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'organizer' })
+  const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
   const [creating, setCreating] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  const loadUsers = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    setUsers(data ?? [])
+  const loadData = async () => {
+    const [{ data: u }, { data: e }] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('events').select('id, name').order('date', { ascending: false }),
+    ])
+    setUsers(u ?? [])
+    setEvents(e ?? [])
   }
 
   useEffect(() => {
@@ -33,7 +41,7 @@ export default function AdminUsersPage() {
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
-      await loadUsers()
+      await loadData()
       setLoading(false)
     }
     init()
@@ -41,19 +49,41 @@ export default function AdminUsersPage() {
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.event_id) { toast.error('Veuillez sélectionner un événement'); return }
     setCreating(true)
+
     const { data: { session } } = await supabase.auth.getSession()
+
+    // 1. Créer le compte
     const res = await fetch('/api/admin/create-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ email: form.email, full_name: form.full_name, password: form.password, role: form.role }),
     })
     const data = await res.json()
-    if (!res.ok) { toast.error(data.error || 'Erreur'); setCreating(false); return }
-    toast.success(`Compte créé pour ${form.email}`)
+    if (!res.ok) { toast.error(data.error || 'Erreur création'); setCreating(false); return }
+
+    const newUserId = data.user.id
+
+    // 2. Assigner à l'événement automatiquement
+    if (form.role === 'organizer') {
+      await fetch('/api/admin/assign-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ action: 'set_organizer', event_id: form.event_id, organizer_id: newUserId }),
+      })
+    } else if (form.role === 'scanner') {
+      await fetch('/api/admin/assign-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ action: 'add_scanner', event_id: form.event_id, scanner_id: newUserId }),
+      })
+    }
+
+    toast.success(`Compte créé et assigné à l'événement`)
     setShowForm(false)
-    setForm({ email: '', full_name: '', password: '', role: 'organizer' })
-    await loadUsers()
+    setForm({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
+    await loadData()
     setCreating(false)
   }
 
@@ -78,30 +108,36 @@ export default function AdminUsersPage() {
           <h3 className="font-medium mb-4">Nouveau compte</h3>
           <form onSubmit={createUser} className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet</label>
-              <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} required />
+              <label className={labelCls}>Nom complet</label>
+              <input className={inputCls} value={form.full_name}
+                onChange={e => setForm({ ...form, full_name: e.target.value })} required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+              <label className={labelCls}>Email</label>
+              <input type="email" className={inputCls} value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })} required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
-              <input type="password"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} />
+              <label className={labelCls}>Mot de passe</label>
+              <input type="password" className={inputCls} value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+              <label className={labelCls}>Rôle</label>
+              <select className={inputCls} value={form.role}
+                onChange={e => setForm({ ...form, role: e.target.value })}>
                 <option value="organizer">Organisateur</option>
                 <option value="scanner">Scanner</option>
-                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Événement assigné <span className="text-red-500">*</span></label>
+              <select className={inputCls} value={form.event_id}
+                onChange={e => setForm({ ...form, event_id: e.target.value })} required>
+                <option value="">— Sélectionner un événement —</option>
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.name}</option>
+                ))}
               </select>
             </div>
             <div className="col-span-2 flex gap-3 justify-end">
@@ -110,7 +146,7 @@ export default function AdminUsersPage() {
               <button type="submit" disabled={creating}
                 className="bg-orange-500 text-white text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-2">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                Créer
+                Créer & Assigner
               </button>
             </div>
           </form>

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import QRCode from 'qrcode'
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
-  const supabase = await createClient()
+  const { id } = params
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
   const { data: guest, error } = await supabase
     .from('guests')
@@ -25,10 +29,10 @@ export async function GET(
     margin: 2,
   })
 
- return new NextResponse(new Uint8Array(png), {
-   headers: {
-     "Content-Type": "image/png",
-     "Content-Disposition": `inline; filename="qr-${guest.full_name}.png"`,
-   },
- });
+  return new NextResponse(new Uint8Array(png), {
+    headers: {
+      'Content-Type': 'image/png',
+      'Content-Disposition': `inline; filename="qr-${guest.full_name}.png"`,
+    },
+  })
 }

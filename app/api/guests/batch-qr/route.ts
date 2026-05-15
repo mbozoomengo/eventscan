@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import JSZip from 'jszip'
@@ -15,9 +15,13 @@ export async function GET(request: NextRequest) {
   const token = request.headers.get('Authorization')?.replace('Bearer ', '')
   if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
 
   const { data: guests, error } = await supabase
     .from('guests')
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
     folder.file(`${sanitize(guest.full_name)}.png`, png)
   }
 
-  const buffer = await zip.generateAsync({ type: 'blob' })
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' })
 
   return new NextResponse(buffer, {
     headers: {
