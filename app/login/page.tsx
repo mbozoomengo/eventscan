@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { QrCode, Mail, Lock, Loader2 } from 'lucide-react'
@@ -10,6 +11,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
+
+  // Redirige immédiatement si une session active existe déjà
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.replace('/dashboard')
+      }
+    }
+    checkSession()
+  }, [router, supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,8 +37,8 @@ export default function LoginPage() {
     }
 
     toast.success('Connexion réussie')
-    // Full page reload pour que le proxy détecte la session
-    window.location.href = '/dashboard'
+    router.push('/dashboard')
+    router.refresh()
   }
 
   return (
