@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function GET() {
   const { data, error } = await supabase.auth.admin.createUser({
-    email: "aw.mengo@gmail.com",
+    email: "mengo@gmail.com",
     password: "691932723",
     email_confirm: true,
     user_metadata: {
