@@ -37,15 +37,15 @@ export async function GET(request: NextRequest) {
 
   for (const guest of guests) {
     const png = await QRCode.toBuffer(guest.qr_token, { type: 'png', width: 300, margin: 2 })
-    folder.file(\.png, png)
+    folder.file(`${sanitize(guest.full_name)}.png`, png)
   }
 
-  const buffer = await zip.generateAsync({ type: 'uint8array' })
+ const buffer = (await zip.generateAsync({ type: "uint8array" })) as Uint8Array;
 
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': ttachment; filename="qrcodes-\.zip",
-    },
-  })
+ return new NextResponse(buffer as unknown as BodyInit, {
+   headers: {
+     "Content-Type": "application/zip",
+     "Content-Disposition": `attachment; filename="qrcodes-${event_id}.zip"`,
+   },
+ });
 }
