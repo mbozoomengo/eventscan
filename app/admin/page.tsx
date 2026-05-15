@@ -37,7 +37,8 @@ export default function AdminDashboard() {
         supabase.from('profiles').select('role'),
         supabase.from('events').select('*', { count: 'exact', head: true }),
         supabase.from('guests').select('*', { count: 'exact', head: true }),
-        supabase.from('scan_logs').select('*', { count: 'exact', head: true }).eq('status', 'success').neq('deleted', true),
+        // Suppression de .neq('deleted', true) — colonne inexistante dans scan_logs
+        supabase.from('scan_logs').select('*', { count: 'exact', head: true }).eq('status', 'success'),
         supabase.from('events').select('id, name, date, location').order('created_at', { ascending: false }).limit(8),
       ])
 

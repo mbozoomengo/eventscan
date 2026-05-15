@@ -13,8 +13,16 @@ function Spin() {
   )
 }
 
+type EventWithCount = {
+  id: string
+  name: string
+  date: string
+  location: string | null
+  guestCount: number
+}
+
 export default function AdminEventsPage() {
-  const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<EventWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -26,12 +34,26 @@ export default function AdminEventsPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
 
+      // Remplace guests(count) — requête embedded non supportée sans foreign key explicite
       const { data: evs } = await supabase
         .from('events')
-        .select('id, name, date, location, guests(count)')
+        .select('id, name, date, location')
         .order('date', { ascending: false })
 
-      setEvents(evs ?? [])
+      if (!evs) { setLoading(false); return }
+
+      // Récupère les counts d'invités séparément
+      const eventsWithCount = await Promise.all(
+        evs.map(async (ev) => {
+          const { count } = await supabase
+            .from('guests')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', ev.id)
+          return { ...ev, guestCount: count ?? 0 }
+        })
+      )
+
+      setEvents(eventsWithCount)
       setLoading(false)
     }
     init()
@@ -64,7 +86,7 @@ export default function AdminEventsPage() {
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                   <Users className="w-3 h-3" />
-                  {(ev.guests as any)?.[0]?.count ?? 0} invités
+                  {ev.guestCount} invités
                 </p>
               </div>
             </div>

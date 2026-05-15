@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
-import { UserPlus, Loader2, Trash2 } from 'lucide-react'
+import { UserPlus, Loader2 } from 'lucide-react'
 
 interface Profile {
   id: string
@@ -29,9 +29,13 @@ export default function AdminUsersClient({
     e.preventDefault()
     setLoading(true)
 
+    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/admin/create-user', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
       body: JSON.stringify(form),
     })
 
@@ -59,7 +63,6 @@ export default function AdminUsersClient({
         </button>
       </div>
 
-      {/* Create user form */}
       {showForm && (
         <div className="card p-5 mb-4 border-orange-200 bg-orange-50">
           <h3 className="font-medium text-gray-900 mb-4">Nouveau compte</h3>
@@ -83,6 +86,7 @@ export default function AdminUsersClient({
               <label className="label">Rôle</label>
               <select className="input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
                 <option value="organizer">Organisateur</option>
+                <option value="scanner">Scanner</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -97,7 +101,6 @@ export default function AdminUsersClient({
         </div>
       )}
 
-      {/* Users table */}
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -114,8 +117,8 @@ export default function AdminUsersClient({
                 <td className="px-4 py-3 font-medium text-gray-900">{u.full_name || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
                 <td className="px-4 py-3">
-                  <span className={u.role === 'admin' ? 'badge-error' : 'badge-warning'}>
-                    {u.role === 'admin' ? 'Admin' : 'Organisateur'}
+                  <span className={u.role === 'admin' ? 'badge-error' : u.role === 'scanner' ? 'badge-info' : 'badge-warning'}>
+                    {u.role === 'admin' ? 'Admin' : u.role === 'scanner' ? 'Scanner' : 'Organisateur'}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500">
