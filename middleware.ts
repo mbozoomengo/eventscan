@@ -50,6 +50,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // Headers anti-cache pour toutes les réponses
+  supabaseResponse.headers.set(
+    "Cache-Control",
+    "no-cache, no-store, must-revalidate"
+  );
+  supabaseResponse.headers.set("Pragma", "no-cache");
+  supabaseResponse.headers.set("Expires", "0");
+
   return supabaseResponse;
 }
 
