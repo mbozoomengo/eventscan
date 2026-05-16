@@ -13,7 +13,6 @@ export default function AdminNewEventPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Vérification auth au montage
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -30,7 +29,6 @@ export default function AdminNewEventPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.replace('/login'); return }
-
     const { data: ev, error } = await supabase.from('events').insert({
       name: form.name,
       description: form.description || null,
@@ -38,7 +36,6 @@ export default function AdminNewEventPage() {
       location: form.location || null,
       owner_id: user.id,
     }).select('id').single()
-
     if (error) { toast.error(error.message); setLoading(false); return }
     toast.success('Événement créé !')
     router.push(`/admin/events/${ev.id}`)
@@ -46,11 +43,10 @@ export default function AdminNewEventPage() {
 
   if (!authChecked) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
-  // Date min = maintenant
   const minDate = new Date().toISOString().slice(0, 16)
 
   return (
@@ -61,37 +57,27 @@ export default function AdminNewEventPage() {
         </Link>
         <h1 className="text-xl font-bold">Nouvel événement</h1>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-xl shadow-sm">
+      <div className="card p-6 max-w-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-            <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
-              placeholder="Gala Charity 2026" />
+            <label className="label">Nom *</label>
+            <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Gala Charity 2026" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date et heure *</label>
-            <input type="datetime-local" min={minDate}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
+            <label className="label">Date et heure *</label>
+            <input type="datetime-local" min={minDate} className="input" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Lieu</label>
-            <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+            <label className="label">Lieu</label>
+            <input className="input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 min-h-[80px] resize-none"
-              value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+            <label className="label">Description</label>
+            <textarea className="input min-h-[80px] resize-none" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="flex gap-3 pt-2">
-            <Link href="/admin/events"
-              className="flex-1 text-center border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors">
-              Annuler
-            </Link>
-            <button type="submit" disabled={loading}
-              className="flex-1 bg-orange-500 text-white text-sm font-medium py-2 rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+            <Link href="/admin/events" className="flex-1 text-center btn-secondary text-sm py-2">Annuler</Link>
+            <button type="submit" disabled={loading} className="flex-1 btn-primary text-sm flex items-center justify-center gap-2">
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Création...</> : "Créer l'événement"}
             </button>
           </div>
