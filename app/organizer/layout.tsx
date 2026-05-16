@@ -9,7 +9,6 @@ function useDarkMode() {
   const [dark, setDark] = useState(false)
 
   useEffect(() => {
-    // Read stored preference, fall back to system preference
     const stored = localStorage.getItem('theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const shouldBeDark = stored ? stored === 'dark' : prefersDark
@@ -36,10 +35,10 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
 
   const nav = [
     { href: '/organizer',              label: 'Dashboard' },
-    { href: '/organizer/guests',       label: 'Invit\u00e9s' },
+    { href: '/organizer/guests',       label: 'Invités' },
     { href: '/organizer/scan',         label: 'Scanner' },
     { href: '/organizer/scan-history', label: 'Historique' },
-    { href: '/organizer/team',         label: '\u00c9quipe' },
+    { href: '/organizer/team',         label: 'Équipe' },
   ]
 
   const isActive = (href: string) =>
@@ -60,9 +59,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
           <nav className="hidden md:flex items-center gap-1">
             {nav.map(({ href, label }) => (
               <Link key={href} href={href}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive(href) ? 'font-semibold' : ''
-                }`}
+                className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
                 style={isActive(href)
                   ? { backgroundColor: 'var(--nav-active-bg)', color: 'var(--nav-active-text)' }
                   : { color: 'var(--text-secondary)' }
@@ -71,32 +68,38 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
               </Link>
             ))}
 
-            {/* Dark mode toggle */}
+            {/* Dark mode toggle — bouton bien visible avec bordure */}
             <button
               onClick={toggle}
               title={dark ? 'Mode clair' : 'Mode sombre'}
               aria-label={dark ? 'Activer le mode clair' : 'Activer le mode sombre'}
-              className="ml-1 p-1.5 rounded-md transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-              style={{ color: 'var(--text-secondary)' }}>
+              className="ml-2 p-1.5 rounded-md border transition-colors"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--bg-card)',
+                color: dark ? '#f59e0b' : '#6366f1',
+              }}>
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            <button onClick={logout} title="D\u00e9connexion" aria-label="D\u00e9connexion"
+            <button onClick={logout} title="Déconnexion" aria-label="Déconnexion"
               className="ml-1 p-1.5 rounded-md transition-colors"
-              style={{ color: 'var(--text-muted)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            >
+              style={{ color: 'var(--text-muted)' }}>
               <LogOut className="w-4 h-4" />
             </button>
           </nav>
 
           {/* Mobile: dark toggle + hamburger */}
-          <div className="md:hidden flex items-center gap-1">
+          <div className="md:hidden flex items-center gap-2">
             <button
               onClick={toggle}
               aria-label={dark ? 'Mode clair' : 'Mode sombre'}
-              className="p-2 rounded-md" style={{ color: 'var(--text-secondary)' }}>
+              className="p-1.5 rounded-md border"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--bg-card)',
+                color: dark ? '#f59e0b' : '#6366f1',
+              }}>
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             <button className="p-2" style={{ color: 'var(--text-secondary)' }} aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
@@ -119,8 +122,8 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
               </Link>
             ))}
             <button onClick={logout}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-md w-full">
-              <LogOut className="w-4 h-4" /> D\u00e9connexion
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-md w-full">
+              <LogOut className="w-4 h-4" /> Déconnexion
             </button>
           </div>
         )}
