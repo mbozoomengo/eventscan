@@ -47,12 +47,21 @@ async function fetchQrBase64(guestId: string, origin: string): Promise<string> {
   return Buffer.from(buf).toString('base64')
 }
 
+function binaryResponse(data: ArrayBuffer, contentType: string, filename: string): Response {
+  return new Response(data, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  })
+}
+
 async function buildPDF(
   guest: { id: string; full_name: string; category: string | null; table_name: string | null },
   event: { name: string; date: string; location: string | null },
   template: Template,
   origin: string
-): Promise<Uint8Array> {
+): Promise<ArrayBuffer> {
   const s = buildStyles(template)
   const qrBase64 = await fetchQrBase64(guest.id, origin)
   const qrSrc = qrBase64 ? `data:image/png;base64,${qrBase64}` : ''
@@ -106,8 +115,9 @@ async function buildPDF(
     )
   )
 
-  const arrayBuffer = await renderToBuffer(doc)
-  return new Uint8Array(arrayBuffer)
+  // renderToBuffer retourne un Buffer Node.js — on accede a son ArrayBuffer sous-jacent
+  const nodeBuf = await renderToBuffer(doc)
+  return nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength) as ArrayBuffer
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -145,6 +155,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const origin = request.nextUrl.origin
 
+  // PDF unitaire
   const guestId = searchParams.get('guest_id')
   if (guestId) {
     const { data: guest } = await supabase
@@ -156,14 +167,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!guest) return NextResponse.json({ error: 'Invite introuvable' }, { status: 404 })
 
     const pdf = await buildPDF(guest, event, template, origin)
-    return new NextResponse(pdf, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="invitation-${guest.full_name.replace(/\s+/g, '-')}.pdf"`,
-      },
-    })
+    return binaryResponse(pdf, 'application/pdf', `invitation-${guest.full_name.replace(/\s+/g, '-')}.pdf`)
   }
 
+  // ZIP tous les PDF
   const allParam = searchParams.get('all')
   if (allParam === 'true') {
     const { data: guests } = await supabase
@@ -184,13 +191,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       })
     )
 
-    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
-    return new NextResponse(new Uint8Array(zipBuffer), {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="invitations-${event.name.replace(/\s+/g, '-')}.zip"`,
-      },
-    })
+    const zipNodeBuf = await zip.generateAsync({ type: 'nodebuffer' })
+    const zipAB = zipNodeBuf.buffer.slice(
+      zipNodeBuf.byteOffset,
+      zipNodeBuf.byteOffset + zipNodeBuf.byteLength
+    ) as ArrayBuffer
+
+    return binaryResponse(zipAB, 'application/zip', `invitations-${event.name.replace(/\s+/g, '-')}.zip`)
   }
 
   return NextResponse.json({ error: 'Parametre manquant: guest_id ou all=true' }, { status: 400 })
