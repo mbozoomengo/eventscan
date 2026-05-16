@@ -47,8 +47,10 @@ export default function OrganizerTeamPage() {
       supabase.from('event_team').select('id, user_id, is_blocked, profiles(id, full_name, email)').eq('event_id', evId).eq('role', 'scanner'),
       supabase.from('profiles').select('id, full_name, email').eq('role', 'scanner'),
     ])
-    const inTeam = new Set((teamData ?? []).map((t: TeamMember) => t.user_id))
-    setTeam((teamData as unknown as TeamMember[]) ?? [])
+    // Supabase infère profiles comme tableau — cast via unknown
+    const typed = (teamData as unknown as TeamMember[]) ?? []
+    const inTeam = new Set(typed.map(t => t.user_id))
+    setTeam(typed)
     setAvailable(((allScanners as unknown as Scanner[]) ?? []).filter(s => !inTeam.has(s.id)))
   }
 
@@ -155,7 +157,7 @@ export default function OrganizerTeamPage() {
         ) : (
           team.map(t => (
             <div key={t.id} className="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-              {/* Avatar initiales */}
+              {/* Avatar initiale */}
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 text-sm font-bold text-gray-500">
                 {(t.profiles?.full_name ?? t.profiles?.email ?? '?')[0]?.toUpperCase()}
               </div>
