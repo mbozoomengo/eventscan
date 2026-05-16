@@ -1,14 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { renderToBuffer, Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer'
+import React from 'react'
+import {
+  renderToBuffer,
+  Document,
+  Page,
+  View,
+  Text,
+  Image,
+  StyleSheet,
+} from '@react-pdf/renderer'
 import JSZip from 'jszip'
+
+const ce = React.createElement
 
 type Template = 'corporate' | 'gala' | 'associatif'
 
 const TEMPLATES: Record<Template, { bg: string; accent: string; font: string }> = {
-  corporate:   { bg: '#FFFFFF', accent: '#1E3A5F', font: '#1E3A5F' },
-  gala:        { bg: '#1A1A2E', accent: '#C9A84C', font: '#F5F5F5' },
-  associatif:  { bg: '#F0FDF4', accent: '#16A34A', font: '#14532D' },
+  corporate:  { bg: '#FFFFFF', accent: '#1E3A5F', font: '#1E3A5F' },
+  gala:       { bg: '#1A1A2E', accent: '#C9A84C', font: '#F5F5F5' },
+  associatif: { bg: '#F0FDF4', accent: '#16A34A', font: '#14532D' },
 }
 
 function buildStyles(tpl: Template) {
@@ -42,63 +53,65 @@ async function buildPDF(
   template: Template,
   origin: string
 ): Promise<Buffer> {
-  const styles = buildStyles(template)
+  const s = buildStyles(template)
   const qrBase64 = await fetchQrBase64(guest.id, origin)
   const qrSrc = qrBase64 ? `data:image/png;base64,${qrBase64}` : ''
+  const dateStr = new Date(event.date).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 
-  const doc = (
-    <Document>
-      <Page size="A5" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{event.name}</Text>
-          <Text style={styles.subtitle}>Invitation personnelle</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Invité</Text>
-          <Text style={styles.value}>{guest.full_name}</Text>
-        </View>
-
-        {guest.category ? (
-          <View style={styles.section}>
-            <Text style={styles.label}>Catégorie</Text>
-            <Text style={styles.value}>{guest.category}</Text>
-          </View>
-        ) : null}
-
-        {guest.table_name ? (
-          <View style={styles.section}>
-            <Text style={styles.label}>Table</Text>
-            <Text style={styles.value}>{guest.table_name}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Date</Text>
-          <Text style={styles.value}>
-            {new Date(event.date).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}
-          </Text>
-        </View>
-
-        {event.location ? (
-          <View style={styles.section}>
-            <Text style={styles.label}>Lieu</Text>
-            <Text style={styles.value}>{event.location}</Text>
-          </View>
-        ) : null}
-
-        {qrSrc ? (
-          <View style={styles.qrBox}>
-            <Image src={qrSrc} style={styles.qrImage} />
-            <Text style={styles.qrCaption}>Présentez ce code à l'entrée</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerTxt}>Document généré par EventScan • Ne pas partager</Text>
-        </View>
-      </Page>
-    </Document>
+  const doc = ce(
+    Document,
+    null,
+    ce(
+      Page,
+      { size: 'A5', style: s.page },
+      // Header
+      ce(View, { style: s.header },
+        ce(Text, { style: s.title }, event.name),
+        ce(Text, { style: s.subtitle }, 'Invitation personnelle'),
+      ),
+      // Invité
+      ce(View, { style: s.section },
+        ce(Text, { style: s.label }, 'Invité'),
+        ce(Text, { style: s.value }, guest.full_name),
+      ),
+      // Catégorie (optionnel)
+      guest.category
+        ? ce(View, { style: s.section },
+            ce(Text, { style: s.label }, 'Catégorie'),
+            ce(Text, { style: s.value }, guest.category),
+          )
+        : null,
+      // Table (optionnel)
+      guest.table_name
+        ? ce(View, { style: s.section },
+            ce(Text, { style: s.label }, 'Table'),
+            ce(Text, { style: s.value }, guest.table_name),
+          )
+        : null,
+      // Date
+      ce(View, { style: s.section },
+        ce(Text, { style: s.label }, 'Date'),
+        ce(Text, { style: s.value }, dateStr),
+      ),
+      // Lieu (optionnel)
+      event.location
+        ? ce(View, { style: s.section },
+            ce(Text, { style: s.label }, 'Lieu'),
+            ce(Text, { style: s.value }, event.location),
+          )
+        : null,
+      // QR code (optionnel)
+      qrSrc
+        ? ce(View, { style: s.qrBox },
+            ce(Image, { src: qrSrc, style: s.qrImage }),
+            ce(Text, { style: s.qrCaption }, "Présentez ce code à l'entrée"),
+          )
+        : null,
+      // Footer
+      ce(View, { style: s.footer },
+        ce(Text, { style: s.footerTxt }, 'Document généré par EventScan • Ne pas partager'),
+      ),
+    )
   )
 
   return Buffer.from(await renderToBuffer(doc))
@@ -159,7 +172,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   }
 
-  // ZIP de tous les PDF
+  // ZIP tous les PDF
   const allParam = searchParams.get('all')
   if (allParam === 'true') {
     const { data: guests } = await supabase
