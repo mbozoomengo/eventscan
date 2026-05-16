@@ -7,7 +7,13 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'EventScan',
-  description: 'Gestion d\'événements avec QR code',
+  description: "Gestion d'événements avec QR code",
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'EventScan',
+  },
 }
 
 export default function RootLayout({
@@ -17,6 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
+      <head>
+        <meta name="theme-color" content="#f97316" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className={inter.className}>
         <Toaster position="top-right" />
         {children}
