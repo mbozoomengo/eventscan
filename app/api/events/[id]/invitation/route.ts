@@ -52,7 +52,7 @@ async function buildPDF(
   event: { name: string; date: string; location: string | null },
   template: Template,
   origin: string
-): Promise<Buffer> {
+): Promise<Uint8Array> {
   const s = buildStyles(template)
   const qrBase64 = await fetchQrBase64(guest.id, origin)
   const qrSrc = qrBase64 ? `data:image/png;base64,${qrBase64}` : ''
@@ -64,63 +64,56 @@ async function buildPDF(
     ce(
       Page,
       { size: 'A5', style: s.page },
-      // Header
       ce(View, { style: s.header },
         ce(Text, { style: s.title }, event.name),
         ce(Text, { style: s.subtitle }, 'Invitation personnelle'),
       ),
-      // Invité
       ce(View, { style: s.section },
-        ce(Text, { style: s.label }, 'Invité'),
+        ce(Text, { style: s.label }, 'Invite'),
         ce(Text, { style: s.value }, guest.full_name),
       ),
-      // Catégorie (optionnel)
       guest.category
         ? ce(View, { style: s.section },
-            ce(Text, { style: s.label }, 'Catégorie'),
+            ce(Text, { style: s.label }, 'Categorie'),
             ce(Text, { style: s.value }, guest.category),
           )
         : null,
-      // Table (optionnel)
       guest.table_name
         ? ce(View, { style: s.section },
             ce(Text, { style: s.label }, 'Table'),
             ce(Text, { style: s.value }, guest.table_name),
           )
         : null,
-      // Date
       ce(View, { style: s.section },
         ce(Text, { style: s.label }, 'Date'),
         ce(Text, { style: s.value }, dateStr),
       ),
-      // Lieu (optionnel)
       event.location
         ? ce(View, { style: s.section },
             ce(Text, { style: s.label }, 'Lieu'),
             ce(Text, { style: s.value }, event.location),
           )
         : null,
-      // QR code (optionnel)
       qrSrc
         ? ce(View, { style: s.qrBox },
             ce(Image, { src: qrSrc, style: s.qrImage }),
-            ce(Text, { style: s.qrCaption }, "Présentez ce code à l'entrée"),
+            ce(Text, { style: s.qrCaption }, "Presentez ce code a l'entree"),
           )
         : null,
-      // Footer
       ce(View, { style: s.footer },
-        ce(Text, { style: s.footerTxt }, 'Document généré par EventScan • Ne pas partager'),
+        ce(Text, { style: s.footerTxt }, 'Document genere par EventScan - Ne pas partager'),
       ),
     )
   )
 
-  return Buffer.from(await renderToBuffer(doc))
+  const arrayBuffer = await renderToBuffer(doc)
+  return new Uint8Array(arrayBuffer)
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = await params
   const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!token) return NextResponse.json({ error: 'Non authentifie' }, { status: 401 })
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -136,12 +129,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .eq('id', eventId)
     .single()
 
-  if (!event) return NextResponse.json({ error: 'Événement introuvable' }, { status: 404 })
+  if (!event) return NextResponse.json({ error: 'Evenement introuvable' }, { status: 404 })
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin'
   if (!isAdmin && event.owner_id !== user.id) {
-    return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    return NextResponse.json({ error: 'Acces refuse' }, { status: 403 })
   }
 
   const searchParams = request.nextUrl.searchParams
@@ -152,7 +145,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const origin = request.nextUrl.origin
 
-  // PDF unitaire
   const guestId = searchParams.get('guest_id')
   if (guestId) {
     const { data: guest } = await supabase
@@ -161,7 +153,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq('id', guestId)
       .eq('event_id', eventId)
       .single()
-    if (!guest) return NextResponse.json({ error: 'Invité introuvable' }, { status: 404 })
+    if (!guest) return NextResponse.json({ error: 'Invite introuvable' }, { status: 404 })
 
     const pdf = await buildPDF(guest, event, template, origin)
     return new NextResponse(pdf, {
@@ -172,7 +164,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   }
 
-  // ZIP tous les PDF
   const allParam = searchParams.get('all')
   if (allParam === 'true') {
     const { data: guests } = await supabase
@@ -182,7 +173,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .order('full_name')
 
     if (!guests || guests.length === 0) {
-      return NextResponse.json({ error: 'Aucun invité' }, { status: 404 })
+      return NextResponse.json({ error: 'Aucun invite' }, { status: 404 })
     }
 
     const zip = new JSZip()
@@ -194,7 +185,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="invitations-${event.name.replace(/\s+/g, '-')}.zip"`,
@@ -202,5 +193,5 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   }
 
-  return NextResponse.json({ error: 'Paramètre manquant: guest_id ou all=true' }, { status: 400 })
+  return NextResponse.json({ error: 'Parametre manquant: guest_id ou all=true' }, { status: 400 })
 }
