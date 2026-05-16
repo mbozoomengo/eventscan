@@ -2,9 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Light theme variables ---- */
+:root {
+  --bg-page:     #f9fafb;
+  --bg-card:     #ffffff;
+  --bg-header:   #ffffff;
+  --border:      #e5e7eb;
+  --border-light:#f3f4f6;
+  --text-primary:#111827;
+  --text-secondary:#6b7280;
+  --text-muted:  #9ca3af;
+  --nav-active-bg:#fff7ed;
+  --nav-active-text:#ea580c;
+  --input-bg:    #ffffff;
+  --input-border:#d1d5db;
+}
+
+/* ---- Dark theme variables ---- */
+.dark {
+  --bg-page:     #0f172a;
+  --bg-card:     #1e293b;
+  --bg-header:   #1e293b;
+  --border:      #334155;
+  --border-light:#1e293b;
+  --text-primary:#f1f5f9;
+  --text-secondary:#94a3b8;
+  --text-muted:  #64748b;
+  --nav-active-bg:#431407;
+  --nav-active-text:#fb923c;
+  --input-bg:    #0f172a;
+  --input-border:#475569;
+}
+
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
   }
 }
 
@@ -15,17 +49,30 @@
   .btn-secondary {
     @apply bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors;
   }
+  .dark .btn-secondary {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--border);
+  }
   .btn-danger {
     @apply bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-colors;
   }
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    border-radius: 0.75rem;
+    border-width: 1px;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    background-color: var(--bg-card);
+    border-color: var(--border);
   }
   .input {
-    @apply w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm;
+    @apply w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
   }
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-medium mb-1;
+    color: var(--text-secondary);
   }
   .badge-success {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
