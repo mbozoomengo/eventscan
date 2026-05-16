@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Calendar, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 function Spin() {
   return (
@@ -34,15 +35,15 @@ export default function AdminEventsPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
 
-      // Remplace guests(count) — requête embedded non supportée sans foreign key explicite
-      const { data: evs } = await supabase
+      const { data: evs, error } = await supabase
         .from('events')
         .select('id, name, date, location')
         .order('date', { ascending: false })
+        .limit(50)
 
+      if (error) { toast.error('Erreur lors du chargement des événements'); setLoading(false); return }
       if (!evs) { setLoading(false); return }
 
-      // Récupère les counts d'invités séparément
       const eventsWithCount = await Promise.all(
         evs.map(async (ev) => {
           const { count } = await supabase

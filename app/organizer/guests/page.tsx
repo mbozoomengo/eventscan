@@ -29,7 +29,7 @@ export default function OrganizerGuestsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/dashboard'); return }
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
 
       const { data: teamEntry } = await supabase
         .from('event_team')
@@ -64,34 +64,39 @@ export default function OrganizerGuestsPage() {
     ))
   }, [search, guests])
 
-  const deleteGuest = async (id: string) => {
-    if (!confirm('Supprimer cet invite ?')) return
+  const deleteGuest = async (id: string, name: string) => {
+    if (!window.confirm(`Supprimer l'invité "${name}" ?`)) return
     const { error } = await supabase.from('guests').delete().eq('id', id)
     if (error) { toast.error(error.message); return }
     setGuests(prev => prev.filter(g => g.id !== id))
-    toast.success('Invite supprime')
+    toast.success('Invité supprimé')
   }
 
   const downloadAllQR = async () => {
     if (!event) return
     setDownloading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`/api/guests/batch-qr?event_id=${event.id}`, {
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    })
-    if (!res.ok) { toast.error('Erreur telechargement'); setDownloading(false); return }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `QRCodes-${event.name}.zip`; a.click()
-    URL.revokeObjectURL(url)
-    setDownloading(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/guests/batch-qr?event_id=${event.id}`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      if (!res.ok) { toast.error('Erreur téléchargement'); setDownloading(false); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `QRCodes-${event.name}.zip`; a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Erreur réseau lors du téléchargement')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   if (loading) return <Spin />
 
   const grouped = filtered.reduce((acc, g) => {
-    const cat = g.category ?? 'Sans categorie'
+    const cat = g.category ?? 'Sans catégorie'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(g)
     return acc
@@ -99,9 +104,8 @@ export default function OrganizerGuestsPage() {
 
   return (
     <>
-      {/* Header responsive */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h1 className="text-xl font-bold">Invites ({guests.length})</h1>
+        <h1 className="text-xl font-bold">Invités ({guests.length})</h1>
         <div className="flex flex-wrap gap-2">
           <button onClick={downloadAllQR} disabled={downloading || guests.length === 0}
             className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
@@ -129,7 +133,7 @@ export default function OrganizerGuestsPage() {
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
-          {search ? 'Aucun resultat' : 'Aucun invite — importez votre liste.'}
+          {search ? 'Aucun résultat' : 'Aucun invité — importez votre liste.'}
         </div>
       ) : (
         <div className="space-y-4">
@@ -148,12 +152,12 @@ export default function OrganizerGuestsPage() {
                   <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       g.checked_in ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>{g.checked_in ? 'Present' : 'Attente'}</span>
+                    }`}>{g.checked_in ? 'Présent' : 'Attente'}</span>
                     <Link href={`/organizer/guests/${g.id}`}
                       className="text-blue-400 hover:text-blue-600 transition-colors p-1">
                       <Eye className="w-4 h-4" />
                     </Link>
-                    <button onClick={() => deleteGuest(g.id)}
+                    <button onClick={() => deleteGuest(g.id, g.full_name)}
                       className="text-gray-300 hover:text-red-500 transition-colors p-1">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

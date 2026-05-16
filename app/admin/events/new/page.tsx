@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -9,14 +9,27 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 export default function AdminNewEventPage() {
   const [form, setForm] = useState({ name: '', description: '', date: '', location: '' })
   const [loading, setLoading] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Vérification auth au montage
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
+      setAuthChecked(true)
+    }
+    init()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { window.location.href = '/login'; return }
+    if (!user) { router.replace('/login'); return }
 
     const { data: ev, error } = await supabase.from('events').insert({
       name: form.name,
@@ -30,6 +43,15 @@ export default function AdminNewEventPage() {
     toast.success('Événement créé !')
     router.push(`/admin/events/${ev.id}`)
   }
+
+  if (!authChecked) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  // Date min = maintenant
+  const minDate = new Date().toISOString().slice(0, 16)
 
   return (
     <>
@@ -49,7 +71,7 @@ export default function AdminNewEventPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date et heure *</label>
-            <input type="datetime-local"
+            <input type="datetime-local" min={minDate}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
           </div>
@@ -70,7 +92,7 @@ export default function AdminNewEventPage() {
             </Link>
             <button type="submit" disabled={loading}
               className="flex-1 bg-orange-500 text-white text-sm font-medium py-2 rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Création...</> : 'Créer et assigner'}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Création...</> : "Créer l'événement"}
             </button>
           </div>
         </form>

@@ -39,13 +39,12 @@ export default function ScanHistoryPage() {
 
   useEffect(() => {
     let channel: any = null
-    let interval: any = null
 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/dashboard'); return }
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
 
       const { data: teamEntry } = await supabase
         .from('event_team').select('event_id').eq('user_id', user.id).single()
@@ -57,7 +56,7 @@ export default function ScanHistoryPage() {
       await loadScans(evId)
       setLoading(false)
 
-      // Realtime subscription
+      // Realtime uniquement (suppression du polling redondant)
       channel = supabase
         .channel(`scan_logs:${evId}`)
         .on('postgres_changes', {
@@ -67,17 +66,11 @@ export default function ScanHistoryPage() {
           filter: `event_id=eq.${evId}`,
         }, () => { loadScans(evId, true) })
         .subscribe()
-
-      // Polling fallback toutes les 5s
-      interval = setInterval(() => {
-        if (eventIdRef.current) loadScans(eventIdRef.current, true)
-      }, 5000)
     }
 
     init()
     return () => {
       if (channel) supabase.removeChannel(channel)
-      if (interval) clearInterval(interval)
     }
   }, [])
 
@@ -92,7 +85,7 @@ export default function ScanHistoryPage() {
   }, [search, statusFilter, scans])
 
   const deleteScan = async (scanId: string) => {
-    if (!confirm('Supprimer ce scan ?')) return
+    if (!window.confirm('Supprimer ce scan ?')) return
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/scan/delete', {
       method: 'POST',
@@ -100,7 +93,7 @@ export default function ScanHistoryPage() {
       body: JSON.stringify({ scan_log_id: scanId }),
     })
     if (res.ok) {
-      toast.success('Scan supprime')
+      toast.success('Scan supprimé')
       setScans(prev => prev.filter(s => s.id !== scanId))
     } else {
       toast.error('Erreur')
@@ -116,7 +109,10 @@ export default function ScanHistoryPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold">Historique des scans</h1>
-          <p className="text-sm text-gray-500">{successCount} entrees valides sur {scans.length} total</p>
+          <p className="text-sm text-gray-500">{successCount} entrées valides sur {scans.length} total</p>
+          {scans.length >= 200 && (
+            <p className="text-xs text-orange-500">Affichage limité aux 200 derniers scans</p>
+          )}
         </div>
         <button
           onClick={() => eventId && loadScans(eventId)}
@@ -139,7 +135,7 @@ export default function ScanHistoryPage() {
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">Tous ({scans.length})</option>
-          <option value="success">Succes ({successCount})</option>
+          <option value="success">Succès ({successCount})</option>
           <option value="already_scanned">Doublons ({scans.filter(s => s.status === 'already_scanned').length})</option>
         </select>
       </div>
@@ -160,7 +156,7 @@ export default function ScanHistoryPage() {
                   : s.status === 'already_scanned' ? 'bg-yellow-100 text-yellow-700'
                   : 'bg-red-100 text-red-700'
                 }`}>
-                  {s.status === 'success' ? 'Succes' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
+                  {s.status === 'success' ? 'Succès' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
                 </span>
                 <button onClick={() => deleteScan(s.id)} className="text-gray-300 hover:text-red-500">
                   <Trash2 className="w-4 h-4" />
@@ -177,7 +173,7 @@ export default function ScanHistoryPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Invite', 'Statut', 'Heure', 'Scanne par', ''].map((h, i) => (
+              {['Invité', 'Statut', 'Heure', 'Scanné par', ''].map((h, i) => (
                 <th key={i} className="text-left px-4 py-2 text-xs text-gray-500">{h}</th>
               ))}
             </tr>
@@ -195,7 +191,7 @@ export default function ScanHistoryPage() {
                     : s.status === 'already_scanned' ? 'bg-yellow-100 text-yellow-700'
                     : 'bg-red-100 text-red-700'
                   }`}>
-                    {s.status === 'success' ? 'Succes' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
+                    {s.status === 'success' ? 'Succès' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{new Date(s.scanned_at).toLocaleString('fr-FR')}</td>

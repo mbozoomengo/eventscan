@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 function Spin() {
   return (
@@ -13,9 +14,25 @@ function Spin() {
   )
 }
 
+type Stats = {
+  users: number
+  organizers: number
+  scanners: number
+  events: number
+  guests: number
+  scans: number
+}
+
+type Event = {
+  id: string
+  name: string
+  date: string
+  location: string | null
+}
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ users: 0, organizers: 0, scanners: 0, events: 0, guests: 0, scans: 0 })
-  const [events, setEvents] = useState<any[]>([])
+  const [stats, setStats] = useState<Stats>({ users: 0, organizers: 0, scanners: 0, events: 0, guests: 0, scans: 0 })
+  const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -28,25 +45,28 @@ export default function AdminDashboard() {
       if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
 
       const [
-        { data: profiles },
-        { count: eventCount },
-        { count: guestCount },
-        { count: scanCount },
-        { data: recentEvents },
+        { data: profiles, error: errProfiles },
+        { count: eventCount, error: errEvents },
+        { count: guestCount, error: errGuests },
+        { count: scanCount, error: errScans },
+        { data: recentEvents, error: errRecent },
       ] = await Promise.all([
         supabase.from('profiles').select('role'),
         supabase.from('events').select('*', { count: 'exact', head: true }),
         supabase.from('guests').select('*', { count: 'exact', head: true }),
-        // Suppression de .neq('deleted', true) — colonne inexistante dans scan_logs
         supabase.from('scan_logs').select('*', { count: 'exact', head: true }).eq('status', 'success'),
         supabase.from('events').select('id, name, date, location').order('created_at', { ascending: false }).limit(8),
       ])
 
+      if (errProfiles || errEvents || errGuests || errScans || errRecent) {
+        toast.error('Erreur lors du chargement des données')
+      }
+
       const ps = profiles ?? []
       setStats({
         users: ps.length,
-        organizers: ps.filter((p: any) => p.role === 'organizer').length,
-        scanners: ps.filter((p: any) => p.role === 'scanner').length,
+        organizers: ps.filter((p) => p.role === 'organizer').length,
+        scanners: ps.filter((p) => p.role === 'scanner').length,
         events: eventCount ?? 0,
         guests: guestCount ?? 0,
         scans: scanCount ?? 0,
@@ -91,7 +111,7 @@ export default function AdminDashboard() {
             <div>
               <p className="font-medium text-gray-900">{ev.name}</p>
               <p className="text-sm text-gray-500">
-                {new Date(ev.date).toLocaleDateString('fr-FR')}
+                {new Date(ev.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 {ev.location ? ` · ${ev.location}` : ''}
               </p>
             </div>

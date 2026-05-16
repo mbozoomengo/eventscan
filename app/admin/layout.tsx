@@ -13,10 +13,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const nav = [
     { href: '/admin',        label: 'Dashboard' },
-    { href: '/admin/events', label: 'Evenements' },
+    { href: '/admin/events', label: 'Événements' },
     { href: '/admin/users',  label: 'Utilisateurs' },
-    { href: '/organizer/scan', label: 'Scanner' },
-    { href: '/organizer/guests', label: 'Invites' },
   ]
 
   const isActive = (href: string) =>
@@ -42,14 +40,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   isActive(href) ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}>{label}</Link>
             ))}
-            <button onClick={logout} title="Deconnexion"
+            <button onClick={logout} title="Déconnexion" aria-label="Déconnexion"
               className="ml-2 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
           </nav>
 
           {/* Mobile hamburger */}
-          <button className="md:hidden p-2 text-gray-500" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="md:hidden p-2 text-gray-500" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -65,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             ))}
             <button onClick={logout}
               className="flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-md w-full">
-              <LogOut className="w-4 h-4" /> Deconnexion
+              <LogOut className="w-4 h-4" /> Déconnexion
             </button>
           </div>
         )}

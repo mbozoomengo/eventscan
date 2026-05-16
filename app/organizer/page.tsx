@@ -26,7 +26,7 @@ export default function OrganizerDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (profile?.role !== 'organizer') { router.replace('/dashboard'); return }
+      if (!profile || !['organizer', 'admin'].includes(profile.role)) { router.replace('/login'); return }
 
       const { data: teamEntry } = await supabase
         .from('event_team')
@@ -35,7 +35,11 @@ export default function OrganizerDashboard() {
         .eq('role', 'organizer')
         .single()
 
-      if (!teamEntry) { toast.error('Aucun événement assigné'); return }
+      if (!teamEntry) {
+        toast.error('Aucun événement assigné')
+        setLoading(false)
+        return
+      }
       const ev = (teamEntry as any).events
       setEvent(ev)
 
@@ -51,6 +55,12 @@ export default function OrganizerDashboard() {
 
   if (loading) return <Spin />
 
+  if (!event) return (
+    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+      Aucun événement assigné. Contactez un administrateur.
+    </div>
+  )
+
   const pct = stats.total > 0 ? Math.round((stats.checked / stats.total) * 100) : 0
 
   return (
@@ -58,7 +68,7 @@ export default function OrganizerDashboard() {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">{event?.name}</h1>
         <p className="text-sm text-gray-500">
-          {event ? new Date(event.date).toLocaleString('fr-FR') : ''}
+          {event ? new Date(event.date).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
           {event?.location ? ` · ${event.location}` : ''}
         </p>
       </div>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { UserPlus, Loader2 } from 'lucide-react'
+import { UserPlus, Loader2, X } from 'lucide-react'
 
 function Spin() {
   return (
@@ -20,18 +20,16 @@ export default function OrganizerTeamPage() {
   const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
   const loadTeam = async (evId: string) => {
-    const { data: teamData } = await supabase
-      .from('event_team')
-      .select('*, profiles(id, full_name, email)')
-      .eq('event_id', evId)
-      .eq('role', 'scanner')
+    const [{ data: teamData }, { data: allScanners }] = await Promise.all([
+      supabase.from('event_team').select('*, profiles(id, full_name, email)').eq('event_id', evId).eq('role', 'scanner'),
+      supabase.from('profiles').select('id, full_name, email').eq('role', 'scanner'),
+    ])
     const inTeam = new Set((teamData ?? []).map((t: any) => t.user_id))
-    const { data: allScanners } = await supabase
-      .from('profiles').select('id, full_name, email').eq('role', 'scanner')
     setTeam(teamData ?? [])
     setAvailable((allScanners ?? []).filter((s: any) => !inTeam.has(s.id)))
   }
@@ -41,7 +39,7 @@ export default function OrganizerTeamPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (profile?.role !== 'organizer') { router.replace('/dashboard'); return }
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
       const { data: teamEntry } = await supabase
         .from('event_team').select('event_id, events(id, name)').eq('user_id', user.id).eq('role', 'organizer').single()
       if (!teamEntry) { router.replace('/organizer'); return }
@@ -70,19 +68,42 @@ export default function OrganizerTeamPage() {
     setSaving(false)
   }
 
+  const removeScanner = async (teamId: string) => {
+    if (!window.confirm('Retirer ce scanner de l\'équipe ?')) return
+    setRemovingId(teamId)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/assign-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action: 'remove_member', team_id: teamId }),
+    })
+    if (res.ok) {
+      toast.success('Scanner retiré')
+      await loadTeam(event.id)
+    } else {
+      toast.error('Erreur lors du retrait')
+    }
+    setRemovingId(null)
+  }
+
   const addScanner = async () => {
     if (!selectedScanner || !event) return
     if (team.length >= 10) { toast.error('Maximum 10 scanners'); return }
     setSaving(true)
-    const { error } = await supabase.from('event_team').insert({
-      event_id: event.id,
-      user_id: selectedScanner,
-      role: 'scanner',
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/assign-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action: 'add_scanner', event_id: event.id, scanner_id: selectedScanner }),
     })
-    if (error) { toast.error(error.message); setSaving(false); return }
-    toast.success('Scanner ajouté')
-    setSelectedScanner('')
-    await loadTeam(event.id)
+    if (res.ok) {
+      toast.success('Scanner ajouté')
+      setSelectedScanner('')
+      await loadTeam(event.id)
+    } else {
+      const data = await res.json()
+      toast.error(data.error || 'Erreur lors de l\'ajout')
+    }
     setSaving(false)
   }
 
@@ -99,7 +120,7 @@ export default function OrganizerTeamPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Scanner', 'Email', 'Statut', 'Action'].map(h => (
+              {['Scanner', 'Email', 'Statut', 'Actions'].map(h => (
                 <th key={h} className="text-left px-4 py-2 text-xs text-gray-500">{h}</th>
               ))}
             </tr>
@@ -117,16 +138,24 @@ export default function OrganizerTeamPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => toggleBlock(t.id, t.is_blocked)}
-                    disabled={saving}
-                    className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${
-                      t.is_blocked
-                        ? 'border-green-300 text-green-600 hover:bg-green-50'
-                        : 'border-red-300 text-red-500 hover:bg-red-50'
-                    }`}>
-                    {t.is_blocked ? 'Débloquer' : 'Bloquer'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleBlock(t.id, t.is_blocked)}
+                      disabled={saving}
+                      className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${
+                        t.is_blocked
+                          ? 'border-green-300 text-green-600 hover:bg-green-50'
+                          : 'border-red-300 text-red-500 hover:bg-red-50'
+                      }`}>
+                      {t.is_blocked ? 'Débloquer' : 'Bloquer'}
+                    </button>
+                    <button
+                      onClick={() => removeScanner(t.id)}
+                      disabled={removingId === t.id}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                      {removingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -148,7 +177,7 @@ export default function OrganizerTeamPage() {
             <select
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               value={selectedScanner} onChange={e => setSelectedScanner(e.target.value)}>
-              <option value="">-- Sélectionner un scanner --</option>
+              <option value="">— Sélectionner un scanner —</option>
               {available.map(s => (
                 <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>
               ))}

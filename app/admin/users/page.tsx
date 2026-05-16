@@ -16,9 +16,17 @@ function Spin() {
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400'
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
 
+type UserProfile = {
+  id: string
+  email: string
+  full_name: string | null
+  role: string
+  created_at: string
+}
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<any[]>([])
-  const [events, setEvents] = useState<any[]>([])
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [events, setEvents] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
@@ -49,7 +57,6 @@ export default function AdminUsersPage() {
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.event_id) { toast.error('Veuillez sélectionner un événement'); return }
     setCreating(true)
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -65,22 +72,29 @@ export default function AdminUsersPage() {
 
     const newUserId = data.user.id
 
-    // 2. Assigner à l'événement automatiquement
-    if (form.role === 'organizer') {
-      await fetch('/api/admin/assign-team', {
+    // 2. Assigner à l'événement si sélectionné
+    if (form.event_id) {
+      const assignRes = await fetch('/api/admin/assign-team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ action: 'set_organizer', event_id: form.event_id, organizer_id: newUserId }),
+        body: JSON.stringify(
+          form.role === 'organizer'
+            ? { action: 'set_organizer', event_id: form.event_id, organizer_id: newUserId }
+            : { action: 'add_scanner', event_id: form.event_id, scanner_id: newUserId }
+        ),
       })
-    } else if (form.role === 'scanner') {
-      await fetch('/api/admin/assign-team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ action: 'add_scanner', event_id: form.event_id, scanner_id: newUserId }),
-      })
+      if (!assignRes.ok) {
+        const assignData = await assignRes.json()
+        toast.error(`Compte créé mais erreur d'assignation : ${assignData.error || 'inconnue'}`)
+        setCreating(false)
+        await loadData()
+        return
+      }
+      toast.success(`Compte créé et assigné à l'événement`)
+    } else {
+      toast.success('Compte créé (aucun événement assigné)')
     }
 
-    toast.success(`Compte créé et assigné à l'événement`)
     setShowForm(false)
     setForm({ email: '', full_name: '', password: '', role: 'organizer', event_id: '' })
     await loadData()
@@ -118,9 +132,9 @@ export default function AdminUsersPage() {
                 onChange={e => setForm({ ...form, email: e.target.value })} required />
             </div>
             <div>
-              <label className={labelCls}>Mot de passe</label>
+              <label className={labelCls}>Mot de passe <span className="text-xs text-gray-400">(min. 8 caractères)</span></label>
               <input type="password" className={inputCls} value={form.password}
-                onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} />
+                onChange={e => setForm({ ...form, password: e.target.value })} required minLength={8} />
             </div>
             <div>
               <label className={labelCls}>Rôle</label>
@@ -131,10 +145,10 @@ export default function AdminUsersPage() {
               </select>
             </div>
             <div className="col-span-2">
-              <label className={labelCls}>Événement assigné <span className="text-red-500">*</span></label>
+              <label className={labelCls}>Événement assigné <span className="text-gray-400 text-xs">(optionnel)</span></label>
               <select className={inputCls} value={form.event_id}
-                onChange={e => setForm({ ...form, event_id: e.target.value })} required>
-                <option value="">— Sélectionner un événement —</option>
+                onChange={e => setForm({ ...form, event_id: e.target.value })}>
+                <option value="">— Aucun événement pour l'instant —</option>
                 {events.map(ev => (
                   <option key={ev.id} value={ev.id}>{ev.name}</option>
                 ))}
@@ -146,14 +160,14 @@ export default function AdminUsersPage() {
               <button type="submit" disabled={creating}
                 className="bg-orange-500 text-white text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-2">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                Créer & Assigner
+                Créer
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {['admin', 'organizer', 'scanner'].map(role => (
+      {(['admin', 'organizer', 'scanner'] as const).map(role => (
         <div key={role} className="mb-6">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
             {roleLabel(role)} ({byRole(role).length})

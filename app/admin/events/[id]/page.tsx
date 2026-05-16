@@ -22,7 +22,9 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
   const [allScanners, setAllScanners] = useState<any[]>([])
   const [stats, setStats] = useState({ guests: 0, scans: 0 })
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingOrg, setSavingOrg] = useState(false)
+  const [savingScanner, setSavingScanner] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const [selectedOrg, setSelectedOrg] = useState('')
   const [selectedScanner, setSelectedScanner] = useState('')
   const router = useRouter()
@@ -81,36 +83,37 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
 
   const assignOrganizer = async () => {
     if (!selectedOrg) return
-    setSaving(true)
+    setSavingOrg(true)
     const res = await callApi({ action: 'set_organizer', event_id: id, organizer_id: selectedOrg })
     const data = await res.json()
-    if (!res.ok) { toast.error(data.error || 'Erreur'); setSaving(false); return }
+    if (!res.ok) { toast.error(data.error || 'Erreur'); setSavingOrg(false); return }
     toast.success('Organisateur assigné')
     setSelectedOrg('')
     await loadData()
-    setSaving(false)
+    setSavingOrg(false)
   }
 
   const addScanner = async () => {
     if (!selectedScanner) return
     if (team.scanners.length >= 10) { toast.error('Maximum 10 scanners'); return }
-    setSaving(true)
+    setSavingScanner(true)
     const res = await callApi({ action: 'add_scanner', event_id: id, scanner_id: selectedScanner })
     const data = await res.json()
-    if (!res.ok) { toast.error(data.error || 'Erreur'); setSaving(false); return }
+    if (!res.ok) { toast.error(data.error || 'Erreur'); setSavingScanner(false); return }
     toast.success('Scanner ajouté')
     setSelectedScanner('')
     await loadData()
-    setSaving(false)
+    setSavingScanner(false)
   }
 
   const removeMember = async (teamId: string) => {
-    setSaving(true)
+    if (!window.confirm('Retirer ce membre de l\'équipe ?')) return
+    setRemovingId(teamId)
     const res = await callApi({ action: 'remove_member', team_id: teamId })
-    if (!res.ok) { toast.error('Erreur'); setSaving(false); return }
-    toast.success('Retiré')
+    if (!res.ok) { toast.error('Erreur'); setRemovingId(null); return }
+    toast.success('Membre retiré')
     await loadData()
-    setSaving(false)
+    setRemovingId(null)
   }
 
   if (loading || !event) return <Spin />
@@ -124,7 +127,7 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
         <div>
           <h1 className="text-xl font-bold text-gray-900">{event.name}</h1>
           <p className="text-sm text-gray-500">
-            {new Date(event.date).toLocaleString('fr-FR')}
+            {new Date(event.date).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             {event.location ? ` · ${event.location}` : ''}
           </p>
         </div>
@@ -154,9 +157,10 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
                 <p className="font-medium text-sm">{(team.organizer.profiles as any)?.full_name || '—'}</p>
                 <p className="text-xs text-gray-500">{(team.organizer.profiles as any)?.email}</p>
               </div>
-              <button onClick={() => removeMember(team.organizer.id)} disabled={saving}
+              <button onClick={() => removeMember(team.organizer.id)}
+                disabled={removingId === team.organizer.id}
                 className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                <X className="w-4 h-4" />
+                {removingId === team.organizer.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
               </button>
             </div>
           ) : (
@@ -169,9 +173,9 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
                   <option key={o.id} value={o.id}>{o.full_name || o.email} ({o.email})</option>
                 ))}
               </select>
-              <button onClick={assignOrganizer} disabled={!selectedOrg || saving}
+              <button onClick={assignOrganizer} disabled={!selectedOrg || savingOrg}
                 className="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-1">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {savingOrg ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 Assigner
               </button>
             </div>
@@ -193,9 +197,10 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
                   {s.is_blocked && (
                     <span className="text-xs bg-red-100 text-red-600 font-medium px-2 py-0.5 rounded-full">Bloqué</span>
                   )}
-                  <button onClick={() => removeMember(s.id)} disabled={saving}
+                  <button onClick={() => removeMember(s.id)}
+                    disabled={removingId === s.id}
                     className="text-red-400 hover:text-red-600 p-1 transition-colors">
-                    <X className="w-4 h-4" />
+                    {removingId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -214,9 +219,9 @@ export default function AdminEventDetailPage({ params }: { params: { id: string 
                   <option key={s.id} value={s.id}>{s.full_name || s.email} ({s.email})</option>
                 ))}
               </select>
-              <button onClick={addScanner} disabled={!selectedScanner || saving}
+              <button onClick={addScanner} disabled={!selectedScanner || savingScanner}
                 className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {savingScanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 Ajouter
               </button>
             </div>

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -20,9 +20,26 @@ export default function OrganizerImportPage() {
   const [guests, setGuests] = useState<GuestRow[]>([])
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [fileName, setFileName] = useState('')
+  const [eventId, setEventId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  // Auth + team check au montage
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
+      const { data: teamEntry } = await supabase
+        .from('event_team').select('event_id').eq('user_id', user.id).eq('role', 'organizer').single()
+      if (!teamEntry) { toast.error('Aucun événement assigné'); router.replace('/organizer'); return }
+      setEventId(teamEntry.event_id)
+    }
+    init()
+  }, [])
 
   const normalizeRows = (data: Record<string, string>[]): GuestRow[] =>
     data.map(row => {
@@ -75,16 +92,12 @@ export default function OrganizerImportPage() {
   }, [])
 
   const handleImport = async () => {
-    if (guests.length === 0) return
+    if (guests.length === 0 || !eventId) return
     setImporting(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.replace('/login'); return }
-    const { data: teamEntry } = await supabase
-      .from('event_team').select('event_id').eq('user_id', user.id).eq('role', 'organizer').single()
-    if (!teamEntry) { toast.error('Aucun événement assigné'); setImporting(false); return }
+    setProgress(0)
 
     const toInsert = guests.map(g => ({
-      event_id: teamEntry.event_id,
+      event_id: eventId,
       full_name: g.full_name,
       email: g.email || null,
       phone: g.phone || null,
@@ -93,17 +106,20 @@ export default function OrganizerImportPage() {
     }))
 
     let errors = 0
-    for (let i = 0; i < toInsert.length; i += 50) {
-      const { error } = await supabase.from('guests').insert(toInsert.slice(i, i + 50))
+    const batchSize = 50
+    for (let i = 0; i < toInsert.length; i += batchSize) {
+      const { error } = await supabase.from('guests').insert(toInsert.slice(i, i + batchSize))
       if (error) errors++
+      setProgress(Math.round(((i + batchSize) / toInsert.length) * 100))
     }
 
     setImporting(false)
+    setProgress(0)
     if (errors === 0) {
       toast.success(`${guests.length} invités importés !`)
       router.push('/organizer/guests')
     } else {
-      toast.error('Certains invités n\'ont pas été importés')
+      toast.error(`Import partiel : ${errors} lot(s) en erreur. Vérifiez les doublons.`)
     }
   }
 
@@ -122,6 +138,7 @@ export default function OrganizerImportPage() {
           <p className="text-xs text-blue-700 mt-0.5">
             Nom (obligatoire) · Email · Téléphone · Catégorie · Table
           </p>
+          <p className="text-xs text-orange-600 mt-1">⚠ Les doublons ne sont pas détectés automatiquement.</p>
         </div>
 
         <div
@@ -184,6 +201,19 @@ export default function OrganizerImportPage() {
                 </table>
               </div>
             </div>
+
+            {importing && progress > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600">Importation en cours...</span>
+                  <span className="font-medium text-orange-500">{Math.min(progress, 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                </div>
+              </div>
+            )}
+
             <button onClick={handleImport} disabled={importing}
               className="w-full bg-orange-500 text-white text-sm font-medium py-3 rounded-xl hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
               {importing

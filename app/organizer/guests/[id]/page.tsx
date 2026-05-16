@@ -6,7 +6,6 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Download, Loader2 } from 'lucide-react'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || ''
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400'
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
 
@@ -30,8 +29,22 @@ export default function GuestDetailPage({ params }: { params: { id: string } }) 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
+
+      // Vérifier que l'invité appartient à l'event de l'organisateur
+      const { data: teamEntry } = await supabase
+        .from('event_team').select('event_id').eq('user_id', user.id).single()
+
       const { data: g } = await supabase.from('guests').select('*').eq('id', id).single()
       if (!g) { router.replace('/organizer/guests'); return }
+
+      // Sécurité : vérifier que l'invité appartient à l'événement de l'organisateur
+      if (teamEntry && g.event_id !== teamEntry.event_id) {
+        router.replace('/organizer/guests')
+        return
+      }
+
       setGuest(g)
       setLoading(false)
     }
@@ -53,7 +66,8 @@ export default function GuestDetailPage({ params }: { params: { id: string } }) 
   }
 
   const shareWhatsApp = () => {
-    const qrUrl = `${SITE_URL}/api/guests/${id}/qr`
+    const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const qrUrl = `${siteUrl}/api/guests/${id}/qr`
     const msg = encodeURIComponent(`Bonjour ${guest.full_name},\nVoici votre QR code d'accès : ${qrUrl}`)
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
