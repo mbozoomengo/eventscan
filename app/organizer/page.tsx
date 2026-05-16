@@ -22,6 +22,11 @@ interface RecentScan {
   guests: { full_name: string } | null
 }
 
+interface TeamEntryShape {
+  event_id: string
+  events: EventRow
+}
+
 // ---- helpers --------------------------------------------------------------
 
 function getGreeting(): string {
@@ -35,9 +40,9 @@ function getEventStatus(dateStr: string): { label: string; cls: string } {
   const now = Date.now()
   const d = new Date(dateStr).getTime()
   const diff = d - now
-  if (diff > 2 * 60 * 60 * 1000) return { label: 'À venir',  cls: 'bg-blue-100 text-blue-700' }
+  if (diff > 2 * 60 * 60 * 1000)  return { label: 'À venir',  cls: 'bg-blue-100 text-blue-700' }
   if (diff > -4 * 60 * 60 * 1000) return { label: 'En cours', cls: 'bg-green-100 text-green-700' }
-  return { label: 'Passé',    cls: 'bg-gray-100 text-gray-500' }
+  return { label: 'Passé', cls: 'bg-gray-100 text-gray-500' }
 }
 
 function initials(name: string): string {
@@ -68,7 +73,7 @@ export default function OrganizerDashboard() {
   const [userName,    setUserName]    = useState('')
   const [isOnline,    setIsOnline]    = useState(true)
   const [loading,     setLoading]     = useState(true)
-  const router  = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
   // network status
@@ -121,7 +126,9 @@ export default function OrganizerDashboard() {
         setLoading(false)
         return
       }
-      const ev = (teamEntry as { event_id: string; events: EventRow }).events
+
+      // Supabase infère events comme tableau — on passe par unknown
+      const ev = (teamEntry as unknown as TeamEntryShape).events
       setEvent(ev)
 
       const [{ count: total }, { count: checked }] = await Promise.all([
@@ -141,7 +148,6 @@ export default function OrganizerDashboard() {
   if (!event) return (
     <div className="min-h-[70vh] flex items-center justify-center">
       <div className="card p-10 text-center max-w-sm mx-auto">
-        {/* simple SVG illustration */}
         <svg viewBox="0 0 120 100" className="w-32 h-32 mx-auto mb-4" aria-hidden>
           <rect x="10" y="20" width="100" height="65" rx="8" fill="#fff7ed" stroke="#fed7aa" strokeWidth="2"/>
           <rect x="25" y="38" width="45" height="6" rx="3" fill="#fdba74"/>
@@ -190,7 +196,7 @@ export default function OrganizerDashboard() {
       </div>
 
       {/* ---- event card ---------------------------------------------------- */}
-      <div className="card p-5 space-y-1">
+      <div className="card p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold text-xl text-gray-900 leading-tight truncate">{event.name}</p>
@@ -231,7 +237,9 @@ export default function OrganizerDashboard() {
       <div className="card p-5">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-600 font-medium">Progression des entrées</span>
-          <span className="font-bold text-gray-900">{stats.checked}<span className="text-gray-400 font-normal">/{stats.total}</span></span>
+          <span className="font-bold text-gray-900">
+            {stats.checked}<span className="text-gray-400 font-normal">/{stats.total}</span>
+          </span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
           <div
@@ -245,6 +253,7 @@ export default function OrganizerDashboard() {
       {/* ---- quick actions ------------------------------------------------- */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Accès rapides</h2>
+
         <Link href="/organizer/scan"
           className="card p-4 flex items-center gap-4 hover:border-orange-300 hover:shadow-md transition-all group">
           <span className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
