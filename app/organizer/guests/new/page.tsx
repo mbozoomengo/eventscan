@@ -18,7 +18,6 @@ export default function NewGuestPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Auth + team check au montage
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -37,6 +36,9 @@ export default function NewGuestPage() {
     e.preventDefault()
     if (!eventId) return
     setLoading(true)
+
+    const qr_token = crypto.randomUUID()
+
     const { error } = await supabase.from('guests').insert({
       event_id: eventId,
       full_name: form.full_name,
@@ -44,9 +46,12 @@ export default function NewGuestPage() {
       phone: form.phone || null,
       category: form.category || null,
       table_name: form.table_name || null,
+      qr_token,
     })
+
     if (error) { toast.error(error.message); setLoading(false); return }
     toast.success('Invité ajouté')
+
     if (addAnother) {
       setForm(emptyForm)
     } else {
@@ -81,7 +86,7 @@ export default function NewGuestPage() {
               className="flex-1 text-center border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors">
               Annuler
             </Link>
-            <button type="button" disabled={loading} onClick={e => handleSubmit(e as any, true)}
+            <button type="button" disabled={loading} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)}
               className="flex-1 border border-orange-400 text-orange-600 text-sm font-medium py-2 rounded-lg hover:bg-orange-50 disabled:opacity-50 transition-colors">
               + Ajouter un autre
             </button>

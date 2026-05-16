@@ -9,6 +9,18 @@ import { ArrowLeft, Download, Loader2 } from 'lucide-react'
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400'
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
 
+interface GuestData {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  category: string | null
+  table_name: string | null
+  checked_in: boolean
+  qr_token: string
+  event_id: string
+}
+
 function Spin() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -19,7 +31,7 @@ function Spin() {
 
 export default function GuestDetailPage({ params }: { params: { id: string } }) {
   const { id } = params
-  const [guest, setGuest] = useState<any>(null)
+  const [guest, setGuest] = useState<GuestData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -32,40 +44,44 @@ export default function GuestDetailPage({ params }: { params: { id: string } }) 
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
 
-      // Vérifier que l'invité appartient à l'event de l'organisateur
       const { data: teamEntry } = await supabase
         .from('event_team').select('event_id').eq('user_id', user.id).single()
 
-      const { data: g } = await supabase.from('guests').select('*').eq('id', id).single()
-      if (!g) { router.replace('/organizer/guests'); return }
+      const { data: g } = await supabase
+        .from('guests')
+        .select('id, full_name, email, phone, category, table_name, checked_in, qr_token, event_id')
+        .eq('id', id)
+        .single()
 
-      // Sécurité : vérifier que l'invité appartient à l'événement de l'organisateur
+      if (!g) { router.replace('/organizer/guests'); return }
       if (teamEntry && g.event_id !== teamEntry.event_id) {
-        router.replace('/organizer/guests')
-        return
+        router.replace('/organizer/guests'); return
       }
 
-      setGuest(g)
+      setGuest(g as GuestData)
       setLoading(false)
     }
     init()
   }, [id])
 
   const save = async () => {
+    if (!guest) return
     setSaving(true)
+    // Ne jamais modifier qr_token
     const { error } = await supabase.from('guests').update({
-      full_name: guest.full_name,
-      email: guest.email,
-      phone: guest.phone,
-      category: guest.category,
+      full_name:  guest.full_name,
+      email:      guest.email,
+      phone:      guest.phone,
+      category:   guest.category,
       table_name: guest.table_name,
     }).eq('id', id)
     if (error) toast.error(error.message)
-    else toast.success('Sauvegardé')
+    else { toast.success('Sauvegardé'); router.push('/organizer/guests') }
     setSaving(false)
   }
 
   const shareWhatsApp = () => {
+    if (!guest) return
     const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
     const qrUrl = `${siteUrl}/api/guests/${id}/qr`
     const msg = encodeURIComponent(`Bonjour ${guest.full_name},\nVoici votre QR code d'accès : ${qrUrl}`)
@@ -89,7 +105,7 @@ export default function GuestDetailPage({ params }: { params: { id: string } }) 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
           <h2 className="font-semibold mb-2">Informations</h2>
-          <div><label className={labelCls}>Nom complet</label><input className={inputCls} value={guest.full_name ?? ''} onChange={e => setGuest({...guest, full_name: e.target.value})} /></div>
+          <div><label className={labelCls}>Nom complet</label><input className={inputCls} value={guest.full_name} onChange={e => setGuest({...guest, full_name: e.target.value})} /></div>
           <div><label className={labelCls}>Email</label><input type="email" className={inputCls} value={guest.email ?? ''} onChange={e => setGuest({...guest, email: e.target.value})} /></div>
           <div><label className={labelCls}>Téléphone</label><input className={inputCls} value={guest.phone ?? ''} onChange={e => setGuest({...guest, phone: e.target.value})} /></div>
           <div><label className={labelCls}>Catégorie</label><input className={inputCls} value={guest.category ?? ''} onChange={e => setGuest({...guest, category: e.target.value})} /></div>

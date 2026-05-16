@@ -80,11 +80,12 @@ create table public.guests (
   full_name text not null,
   email text,
   phone text,
-  category text,        -- nom table/catégorie
-  table_name text,      -- table assignée
+  category text,
+  table_name text,
   qr_token text unique not null default uuid_generate_v4()::text,
   checked_in boolean default false,
   checked_in_at timestamptz,
+  invitation_sent_at timestamptz null,
   created_at timestamptz default now()
 );
 
@@ -127,8 +128,6 @@ create table public.scan_logs (
 
 alter table public.scan_logs enable row level security;
 
--- FIX: l'organisateur est assigné via event_team (pas owner_id),
--- la policy précédente bloquait silencieusement la lecture (200 OK, data vide)
 create policy "Organizers can view scan logs of their events"
   on public.scan_logs for all
   using (
@@ -180,3 +179,6 @@ create index guests_event_id_idx on public.guests(event_id);
 create index guests_qr_token_idx on public.guests(qr_token);
 create index events_owner_id_idx on public.events(owner_id);
 create index scan_logs_event_id_idx on public.scan_logs(event_id);
+
+-- Migration: ajout invitation_sent_at
+-- ALTER TABLE public.guests ADD COLUMN IF NOT EXISTS invitation_sent_at timestamptz null;
