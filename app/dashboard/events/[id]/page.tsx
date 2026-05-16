@@ -18,7 +18,7 @@ interface Guest {
   checked_in_at: string | null
 }
 
-interface Event {
+interface EventData {
   id: string
   name: string
   date: string
@@ -50,7 +50,7 @@ function buildSlots(guests: Guest[]): Slot[] {
 
 function ArrivalsChart({ slots }: { slots: Slot[] }) {
   if (slots.length === 0) return (
-    <p className="text-xs text-gray-400 text-center py-6">Aucune arrivée enregistrée</p>
+    <p className="text-xs text-gray-400 text-center py-6">Aucune arrivee enregistree</p>
   )
 
   const W = 480
@@ -62,8 +62,7 @@ function ArrivalsChart({ slots }: { slots: Slot[] }) {
   const barW = Math.max(4, chartW / slots.length - 4)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Courbe arrivées">
-      {/* Gridlines */}
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Courbe arrivees">
       {[0, 0.5, 1].map((r) => {
         const y = PAD.top + chartH * (1 - r)
         return (
@@ -76,7 +75,6 @@ function ArrivalsChart({ slots }: { slots: Slot[] }) {
           </g>
         )
       })}
-      {/* Bars */}
       {slots.map((s, i) => {
         const x = PAD.left + i * (chartW / slots.length) + (chartW / slots.length - barW) / 2
         const barH = (s.count / maxCount) * chartH
@@ -98,7 +96,7 @@ function ArrivalsChart({ slots }: { slots: Slot[] }) {
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [event, setEvent] = useState<Event | null>(null)
+  const [event, setEvent] = useState<EventData | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -106,13 +104,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const applyChange = useCallback(
-    (payload: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => {
+    (payload: { eventType: string; new: unknown; old: unknown }) => {
       if (payload.eventType === 'INSERT') {
         setGuests(prev => [...prev, payload.new as Guest])
       } else if (payload.eventType === 'UPDATE') {
-        setGuests(prev => prev.map(g => g.id === (payload.new as Guest).id ? (payload.new as Guest) : g))
+        const updated = payload.new as Guest
+        setGuests(prev => prev.map(g => g.id === updated.id ? updated : g))
       } else if (payload.eventType === 'DELETE') {
-        setGuests(prev => prev.filter(g => g.id !== (payload.old as { id: string }).id))
+        const deleted = payload.old as { id: string }
+        setGuests(prev => prev.filter(g => g.id !== deleted.id))
       }
     },
     []
@@ -133,11 +133,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       ])
 
       if (!ev) { router.replace('/dashboard'); return }
-      setEvent(ev as Event)
+      setEvent(ev as EventData)
       setGuests((gs as Guest[]) ?? [])
       setLoading(false)
 
-      // Realtime
       const channel = supabase
         .channel(`guests-${id}`)
         .on(
@@ -170,7 +169,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const pct     = total > 0 ? Math.round((checked / total) * 100) : 0
 
   const grouped = guests.reduce<Record<string, Guest[]>>((acc, g) => {
-    const cat = g.category ?? 'Sans catégorie'
+    const cat = g.category ?? 'Sans categorie'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(g)
     return acc
@@ -187,6 +186,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const shareOnWhatsApp = (guestId: string, guestName: string) => {
     const qrUrl = `${SITE_URL}/api/guests/${guestId}/qr`
     const msg = encodeURIComponent(`Voici votre invitation QR code pour ${event.name} :\n${qrUrl}`)
+    void guestName
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
 
@@ -203,20 +203,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         {event.location ? ` · ${event.location}` : ''}
       </p>
 
-      {/* Stats globales */}
       <div className="flex gap-4 mb-4 text-sm">
         <span className="flex items-center gap-1 text-gray-600">
-          <Users className="w-4 h-4" /> {total} invités
+          <Users className="w-4 h-4" /> {total} invites
         </span>
         <span className="flex items-center gap-1 text-green-600">
-          <CheckCircle className="w-4 h-4" /> {checked} présents
+          <CheckCircle className="w-4 h-4" /> {checked} presents
         </span>
         <span className="flex items-center gap-1 text-orange-500">
           <Clock className="w-4 h-4" /> {total - checked} en attente
         </span>
       </div>
 
-      {/* Barre de progression globale */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-500 font-medium">Progression globale</span>
@@ -228,7 +226,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             style={{ width: `${pct}%` }}
           />
         </div>
-        {/* Breakdown par catégorie */}
         {categoryStats.length > 1 && (
           <div className="mt-3 space-y-1.5">
             {categoryStats.map(({ cat, total: t, checked: c }) => (
@@ -247,10 +244,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {/* Courbe arrivées */}
       {checked > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 mb-2">Arrivées par tranche de 30 min</p>
+          <p className="text-sm font-medium text-gray-500 mb-2">Arrivees par tranche de 30 min</p>
           <ArrivalsChart slots={slots} />
         </div>
       )}
@@ -269,7 +265,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {total === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-12">Aucun invité — importez votre liste.</p>
+        <p className="text-gray-400 text-sm text-center py-12">Aucun invite — importez votre liste.</p>
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).map(([cat, list]) => (
