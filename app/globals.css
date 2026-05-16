@@ -4,34 +4,34 @@
 
 /* ---- Light theme variables ---- */
 :root {
-  --bg-page:     #f9fafb;
-  --bg-card:     #ffffff;
-  --bg-header:   #ffffff;
-  --border:      #e5e7eb;
-  --border-light:#f3f4f6;
-  --text-primary:#111827;
-  --text-secondary:#6b7280;
-  --text-muted:  #9ca3af;
-  --nav-active-bg:#fff7ed;
-  --nav-active-text:#ea580c;
-  --input-bg:    #ffffff;
-  --input-border:#d1d5db;
+  --bg-page:        #f9fafb;
+  --bg-card:        #ffffff;
+  --bg-header:      #ffffff;
+  --border:         #e5e7eb;
+  --border-light:   #f3f4f6;
+  --text-primary:   #111827;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+  --nav-active-bg:  #eff6ff;
+  --nav-active-text:#2563eb;
+  --input-bg:       #ffffff;
+  --input-border:   #d1d5db;
 }
 
 /* ---- Dark theme variables ---- */
 .dark {
-  --bg-page:     #0f172a;
-  --bg-card:     #1e293b;
-  --bg-header:   #1e293b;
-  --border:      #334155;
-  --border-light:#1e293b;
-  --text-primary:#f1f5f9;
-  --text-secondary:#94a3b8;
-  --text-muted:  #64748b;
-  --nav-active-bg:#431407;
-  --nav-active-text:#fb923c;
-  --input-bg:    #0f172a;
-  --input-border:#475569;
+  --bg-page:        #0f172a;
+  --bg-card:        #1e293b;
+  --bg-header:      #1e293b;
+  --border:         #334155;
+  --border-light:   #1e293b;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --nav-active-bg:  #1e3a5f;
+  --nav-active-text:#60a5fa;
+  --input-bg:       #0f172a;
+  --input-border:   #475569;
 }
 
 @layer base {
@@ -44,7 +44,7 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
     @apply bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors;
@@ -65,7 +65,7 @@
     border-color: var(--border);
   }
   .input {
-    @apply w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm;
+    @apply w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm;
     background-color: var(--input-bg);
     border: 1px solid var(--input-border);
     color: var(--text-primary);

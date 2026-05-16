@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react'
 
 function useDarkMode() {
   const [dark, setDark] = useState(false)
-
   useEffect(() => {
     const stored = localStorage.getItem('theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -15,14 +14,12 @@ function useDarkMode() {
     setDark(shouldBeDark)
     document.documentElement.classList.toggle('dark', shouldBeDark)
   }, [])
-
   const toggle = () => {
     const next = !dark
     setDark(next)
     document.documentElement.classList.toggle('dark', next)
     localStorage.setItem('theme', next ? 'dark' : 'light')
   }
-
   return { dark, toggle }
 }
 
@@ -49,13 +46,12 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-10 border-b" style={{ backgroundColor: 'var(--bg-header)', borderColor: 'var(--border)' }}>
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
               <QrCode className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>EventScan</span>
           </div>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
             {nav.map(({ href, label }) => (
               <Link key={href} href={href}
@@ -68,17 +64,11 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
               </Link>
             ))}
 
-            {/* Dark mode toggle — bouton bien visible avec bordure */}
-            <button
-              onClick={toggle}
+            <button onClick={toggle}
               title={dark ? 'Mode clair' : 'Mode sombre'}
               aria-label={dark ? 'Activer le mode clair' : 'Activer le mode sombre'}
               className="ml-2 p-1.5 rounded-md border transition-colors"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--bg-card)',
-                color: dark ? '#f59e0b' : '#6366f1',
-              }}>
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-card)', color: dark ? '#f59e0b' : '#6366f1' }}>
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
@@ -89,17 +79,10 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
             </button>
           </nav>
 
-          {/* Mobile: dark toggle + hamburger */}
           <div className="md:hidden flex items-center gap-2">
-            <button
-              onClick={toggle}
-              aria-label={dark ? 'Mode clair' : 'Mode sombre'}
+            <button onClick={toggle} aria-label={dark ? 'Mode clair' : 'Mode sombre'}
               className="p-1.5 rounded-md border"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--bg-card)',
-                color: dark ? '#f59e0b' : '#6366f1',
-              }}>
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-card)', color: dark ? '#f59e0b' : '#6366f1' }}>
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             <button className="p-2" style={{ color: 'var(--text-secondary)' }} aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
@@ -108,7 +91,6 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden border-t px-4 py-3 space-y-1" style={{ backgroundColor: 'var(--bg-header)', borderColor: 'var(--border)' }}>
             {nav.map(({ href, label }) => (
@@ -128,7 +110,6 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
           </div>
         )}
       </header>
-
       <main className="max-w-4xl mx-auto px-4 py-6">{children}</main>
     </div>
   )

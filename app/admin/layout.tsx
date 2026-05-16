@@ -25,19 +25,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
               <QrCode className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-bold text-sm text-gray-900">EventScan</span>
             <span className="text-xs bg-red-100 text-red-600 font-medium px-2 py-0.5 rounded-full">Admin</span>
           </div>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
             {nav.map(({ href, label }) => (
               <Link key={href} href={href}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive(href) ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  isActive(href) ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}>{label}</Link>
             ))}
             <button onClick={logout} title="Déconnexion" aria-label="Déconnexion"
@@ -46,19 +45,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </nav>
 
-          {/* Mobile hamburger */}
           <button className="md:hidden p-2 text-gray-500" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
             {nav.map(({ href, label }) => (
               <Link key={href} href={href} onClick={() => setMenuOpen(false)}
                 className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive(href) ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'
+                  isActive(href) ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
                 }`}>{label}</Link>
             ))}
             <button onClick={logout}
