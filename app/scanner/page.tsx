@@ -21,9 +21,16 @@ interface RecentScan {
   time: string
 }
 
+interface EventRow { id: string; name: string; date: string }
+interface TeamEntryShape {
+  event_id: string
+  is_blocked: boolean
+  events: EventRow
+}
+
 const OVERLAY_CONFIG: Record<ScanStatus, { color: string; label: string }> = {
-  success:         { color: 'bg-green-500',  label: '✓ Bienvenue !' },
-  already_scanned: { color: 'bg-red-500',    label: 'Déjà enregistré' },
+  success:         { color: 'bg-green-500',  label: '\u2713 Bienvenue !' },
+  already_scanned: { color: 'bg-red-500',    label: 'D\u00e9j\u00e0 enregistr\u00e9' },
   invalid:         { color: 'bg-orange-500', label: 'QR invalide' },
 }
 
@@ -53,18 +60,18 @@ function vibrate(pattern: number | number[]) {
 }
 
 export default function ScannerPage() {
-  const [event,   setEvent]   = useState<{ id: string; name: string; date: string } | null>(null)
+  const [event,    setEvent]    = useState<EventRow | null>(null)
   const [scanning, setScanning] = useState(false)
   const [overlay,  setOverlay]  = useState<ScanResult | null>(null)
   const [stats,    setStats]    = useState({ total: 0, checked: 0 })
   const [blocked,  setBlocked]  = useState(false)
 
-  const scannerRef  = useRef<Html5Qrcode | null>(null)
-  const cooldown    = useRef(false)
+  const scannerRef   = useRef<Html5Qrcode | null>(null)
+  const cooldown     = useRef(false)
   const sessionToken = useRef<string>('')
-  const beep        = useRef(createBeeper())
-  const guestsCache = useRef<CachedGuest[]>([])
-  const recentScans = useRef<RecentScan[]>([])
+  const beep         = useRef(createBeeper())
+  const guestsCache  = useRef<CachedGuest[]>([])
+  const recentScans  = useRef<RecentScan[]>([])
   const [recentScansDisplay, setRecentScansDisplay] = useState<RecentScan[]>([])
 
   const router   = useRouter()
@@ -97,10 +104,11 @@ export default function ScannerPage() {
         .eq('role', 'scanner')
         .single()
 
-      if (!teamEntry) { toast.error('Aucun événement assigné'); return }
+      if (!teamEntry) { toast.error('Aucun \u00e9v\u00e9nement assign\u00e9'); return }
       if (teamEntry.is_blocked) { setBlocked(true); return }
 
-      const ev = (teamEntry as { event_id: string; is_blocked: boolean; events: { id: string; name: string; date: string } }).events
+      // cast via unknown — Supabase inf\u00e8re events comme tableau
+      const ev = (teamEntry as unknown as TeamEntryShape).events
       setEvent(ev)
       refreshStats(ev.id)
 
@@ -198,7 +206,7 @@ export default function ScannerPage() {
       )
       setScanning(true)
     } catch {
-      toast.error("Impossible d'accéder à la caméra")
+      toast.error("Impossible d'acc\u00e9der \u00e0 la cam\u00e9ra")
     }
   }, [handleScan])
 
@@ -211,8 +219,8 @@ export default function ScannerPage() {
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="bg-red-900/30 border border-red-600 rounded-xl p-8 text-center max-w-sm">
         <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <p className="font-semibold text-red-300">Accès bloqué</p>
-        <p className="text-sm text-gray-400 mt-2">Vous avez été bloqué par l'organisateur.</p>
+        <p className="font-semibold text-red-300">Acc\u00e8s bloqu\u00e9</p>
+        <p className="text-sm text-gray-400 mt-2">Vous avez \u00e9t\u00e9 bloqu\u00e9 par l'organisateur.</p>
       </div>
     </div>
   )
@@ -223,7 +231,6 @@ export default function ScannerPage() {
   return (
     <div className="space-y-4">
 
-      {/* Overlay plein écran post-scan */}
       {overlay && overlayCfg && (
         <div className={`fixed inset-0 z-40 flex flex-col items-center justify-center ${overlayCfg.color} text-white`}>
           <p className="text-4xl font-black mb-4">{overlayCfg.label}</p>
@@ -240,7 +247,7 @@ export default function ScannerPage() {
       {event && (
         <div className="text-center">
           <p className="font-semibold">{event.name}</p>
-          <p className="text-sm text-gray-400">{stats.checked}/{stats.total} entrées</p>
+          <p className="text-sm text-gray-400">{stats.checked}/{stats.total} entr\u00e9es</p>
         </div>
       )}
 
@@ -252,14 +259,14 @@ export default function ScannerPage() {
           <button
             onClick={startScanner}
             className="bg-orange-500 text-white font-medium px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto">
-            <Camera className="w-4 h-4" /> Activer la caméra
+            <Camera className="w-4 h-4" /> Activer la cam\u00e9ra
           </button>
         </div>
       ) : (
         <button
           onClick={stopScanner}
           className="w-full bg-gray-700 text-gray-300 text-sm font-medium py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
-          <CameraOff className="w-4 h-4" /> Arrêter
+          <CameraOff className="w-4 h-4" /> Arr\u00eater
         </button>
       )}
 
@@ -293,7 +300,7 @@ export default function ScannerPage() {
                       ? 'bg-red-900/50 text-red-400'
                       : 'bg-orange-900/50 text-orange-400'
                   }`}>
-                    {s.status === 'success' ? '✓' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
+                    {s.status === 'success' ? '\u2713' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
                   </span>
                   <span className="text-xs text-gray-500">{s.time}</span>
                 </div>

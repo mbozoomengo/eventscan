@@ -24,10 +24,10 @@ function Spin() {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  success: 'Succès',
+  success: 'Succ\u00e8s',
   already_scanned: 'Doublon',
   invalid: 'Invalide',
-  cancelled: 'Annulé',
+  cancelled: 'Annul\u00e9',
 }
 
 const STATUS_CLASS: Record<string, string> = {
@@ -38,25 +38,26 @@ const STATUS_CLASS: Record<string, string> = {
 }
 
 export default function ScanHistoryPage() {
-  const [scans, setScans] = useState<ScanLog[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [scans,         setScans]         = useState<ScanLog[]>([])
+  const [search,        setSearch]        = useState('')
+  const [statusFilter,  setStatusFilter]  = useState('all')
   const [scannerFilter, setScannerFilter] = useState('all')
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [eventId, setEventId] = useState<string | null>(null)
-  const router = useRouter()
+  const [page,          setPage]          = useState(1)
+  const [loading,       setLoading]       = useState(true)
+  const [refreshing,    setRefreshing]    = useState(false)
+  const [eventId,       setEventId]       = useState<string | null>(null)
+  const router   = useRouter()
   const supabase = createClient()
 
   const loadScans = useCallback(async (evId: string, silent = false) => {
     if (!silent) setRefreshing(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('scan_logs')
       .select('id, scanned_at, status, guests(full_name, category), profiles(full_name)')
       .eq('event_id', evId)
       .order('scanned_at', { ascending: false })
       .limit(500)
+    if (error) console.error('[scan-history] loadScans error:', error)
     setScans((data as unknown as ScanLog[]) ?? [])
     if (!silent) setRefreshing(false)
   }, [supabase])
@@ -67,11 +68,22 @@ export default function ScanHistoryPage() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!['organizer', 'admin'].includes(profile?.role ?? '')) { router.replace('/login'); return }
 
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('id', user.id).single()
+      if (!['organizer', 'admin'].includes(profile?.role ?? '')) {
+        router.replace('/login'); return
+      }
+
+      // filtre explicite sur le r\u00f4le organizer pour \u00e9viter de r\u00e9cup\u00e9rer
+      // une entr\u00e9e scanner qui aurait un event_id diff\u00e9rent
       const { data: teamEntry } = await supabase
-        .from('event_team').select('event_id').eq('user_id', user.id).single()
+        .from('event_team')
+        .select('event_id')
+        .eq('user_id', user.id)
+        .eq('role', 'organizer')
+        .single()
+
       if (!teamEntry) { router.replace('/organizer'); return }
 
       const evId = teamEntry.event_id
@@ -91,12 +103,9 @@ export default function ScanHistoryPage() {
     }
 
     init()
-    return () => {
-      if (channel) supabase.removeChannel(channel)
-    }
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
-  // Scanners uniques pour le select
   const scanners = useMemo(() => {
     const map = new Map<string, string>()
     scans.forEach(s => {
@@ -106,10 +115,9 @@ export default function ScanHistoryPage() {
     return Array.from(map.values()).sort()
   }, [scans])
 
-  // Filtrage client
   const filtered = useMemo(() => {
     let data = scans
-    if (statusFilter !== 'all') data = data.filter(s => s.status === statusFilter)
+    if (statusFilter !== 'all')  data = data.filter(s => s.status === statusFilter)
     if (scannerFilter !== 'all') data = data.filter(s => s.profiles?.full_name === scannerFilter)
     if (search) {
       const q = search.toLowerCase()
@@ -118,19 +126,16 @@ export default function ScanHistoryPage() {
     return data
   }, [scans, statusFilter, scannerFilter, search])
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = useMemo(
+  const paginated  = useMemo(
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [filtered, page]
   )
 
-  // Reset page quand filtre change
   useEffect(() => { setPage(1) }, [search, statusFilter, scannerFilter])
 
-  // Export CSV côté client, sans lib
   const exportCSV = () => {
-    const headers = ['Heure', 'Invité', 'Catégorie', 'Statut', 'Scanné par']
+    const headers = ['Heure', 'Invit\u00e9', 'Cat\u00e9gorie', 'Statut', 'Scann\u00e9 par']
     const rows = filtered.map(s => [
       new Date(s.scanned_at).toLocaleString('fr-FR'),
       s.guests?.full_name ?? '',
@@ -142,8 +147,8 @@ export default function ScanHistoryPage() {
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       .join('\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
     a.href = url
     a.download = `scan-history-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
@@ -159,7 +164,7 @@ export default function ScanHistoryPage() {
       body: JSON.stringify({ scan_log_id: scanId }),
     })
     if (res.ok) {
-      toast.success('Scan supprimé')
+      toast.success('Scan supprim\u00e9')
       setScans(prev => prev.filter(s => s.id !== scanId))
     } else {
       toast.error('Erreur')
@@ -175,18 +180,14 @@ export default function ScanHistoryPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold">Historique des scans</h1>
-          <p className="text-sm text-gray-500">{successCount} entrées valides sur {scans.length} total</p>
+          <p className="text-sm text-gray-500">{successCount} entr\u00e9es valides sur {scans.length} total</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportCSV}
-            disabled={filtered.length === 0}
+          <button onClick={exportCSV} disabled={filtered.length === 0}
             className="flex items-center gap-1 text-sm text-gray-600 hover:text-orange-500 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50">
             <Download className="w-4 h-4" /> CSV
           </button>
-          <button
-            onClick={() => eventId && loadScans(eventId)}
-            disabled={refreshing}
+          <button onClick={() => eventId && loadScans(eventId)} disabled={refreshing}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-orange-500 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
@@ -194,7 +195,6 @@ export default function ScanHistoryPage() {
         </div>
       </div>
 
-      {/* Filtres */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-40">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -203,22 +203,18 @@ export default function ScanHistoryPage() {
             placeholder="Rechercher par nom..."
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">Tous les statuts ({scans.length})</option>
-          <option value="success">Succès ({scans.filter(s => s.status === 'success').length})</option>
+          <option value="success">Succ\u00e8s ({scans.filter(s => s.status === 'success').length})</option>
           <option value="already_scanned">Doublons ({scans.filter(s => s.status === 'already_scanned').length})</option>
           <option value="invalid">Invalides ({scans.filter(s => s.status === 'invalid').length})</option>
-          <option value="cancelled">Annulés ({scans.filter(s => s.status === 'cancelled').length})</option>
+          <option value="cancelled">Annul\u00e9s ({scans.filter(s => s.status === 'cancelled').length})</option>
         </select>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           value={scannerFilter} onChange={e => setScannerFilter(e.target.value)}>
           <option value="all">Tous les scanners</option>
-          {scanners.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+          {scanners.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
@@ -228,19 +224,15 @@ export default function ScanHistoryPage() {
           <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium text-sm">{s.guests?.full_name || '—'}</p>
+                <p className="font-medium text-sm">{s.guests?.full_name || '\u2014'}</p>
                 {s.guests?.category && <p className="text-xs text-gray-400">{s.guests.category}</p>}
                 <p className="text-xs text-gray-400 mt-1">{new Date(s.scanned_at).toLocaleString('fr-FR')}</p>
-                {s.profiles?.full_name && (
-                  <p className="text-xs text-gray-400">par {s.profiles.full_name}</p>
-                )}
+                {s.profiles?.full_name && <p className="text-xs text-gray-400">par {s.profiles.full_name}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
                   STATUS_CLASS[s.status] ?? 'bg-gray-100 text-gray-600'
-                }`}>
-                  {STATUS_LABEL[s.status] ?? s.status}
-                </span>
+                }`}>{STATUS_LABEL[s.status] ?? s.status}</span>
                 <button onClick={() => deleteScan(s.id)} className="text-gray-300 hover:text-red-500">
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -256,7 +248,7 @@ export default function ScanHistoryPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Heure', 'Invité', 'Statut', 'Scanné par', ''].map((h, i) => (
+              {['Heure', 'Invit\u00e9', 'Statut', 'Scann\u00e9 par', ''].map((h, i) => (
                 <th key={i} className="text-left px-4 py-2 text-xs text-gray-500">{h}</th>
               ))}
             </tr>
@@ -268,17 +260,15 @@ export default function ScanHistoryPage() {
                   {new Date(s.scanned_at).toLocaleString('fr-FR')}
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium">{s.guests?.full_name || '—'}</p>
+                  <p className="font-medium">{s.guests?.full_name || '\u2014'}</p>
                   {s.guests?.category && <p className="text-xs text-gray-400">{s.guests.category}</p>}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     STATUS_CLASS[s.status] ?? 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {STATUS_LABEL[s.status] ?? s.status}
-                  </span>
+                  }`}>{STATUS_LABEL[s.status] ?? s.status}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{s.profiles?.full_name || '—'}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{s.profiles?.full_name || '\u2014'}</td>
                 <td className="px-4 py-3">
                   <button onClick={() => deleteScan(s.id)} className="text-gray-300 hover:text-red-500 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
@@ -293,23 +283,18 @@ export default function ScanHistoryPage() {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <p className="text-xs text-gray-400">
-            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} sur {filtered.length}
+            {(page - 1) * PAGE_SIZE + 1}\u2013{Math.min(page * PAGE_SIZE, filtered.length)} sur {filtered.length}
           </p>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-sm px-2">{page} / {totalPages}</span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
