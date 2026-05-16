@@ -22,6 +22,11 @@ interface Guest {
   invitation_sent_at: string | null
 }
 
+interface TeamEntryShape {
+  event_id: string
+  events: { id: string; name: string }
+}
+
 function Spin() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -59,7 +64,9 @@ export default function OrganizerGuestsPage() {
         .single()
       if (!teamEntry) { router.replace('/organizer'); return }
 
-      const ev = (teamEntry as { event_id: string; events: { id: string; name: string } }).events
+      // Supabase retourne les joins comme un objet quand .single() est utilisé
+      // mais TS l'infère comme tableau — on passe par unknown pour lever l'ambiguïté
+      const ev = (teamEntry as unknown as TeamEntryShape).events
       setEvent(ev)
 
       const { data: gs } = await supabase
@@ -97,11 +104,11 @@ export default function OrganizerGuestsPage() {
   }, [])
 
   const deleteGuest = async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer l'invité "${name}" ?`)) return
+    if (!window.confirm(`Supprimer l'invite "${name}" ?`)) return
     const { error } = await supabase.from('guests').delete().eq('id', id)
     if (error) { toast.error(error.message); return }
     setGuests(prev => prev.filter(g => g.id !== id))
-    toast.success('Invité supprimé')
+    toast.success('Invite supprime')
   }
 
   const downloadAllQR = async () => {
@@ -112,13 +119,13 @@ export default function OrganizerGuestsPage() {
       const res = await fetch(`/api/guests/batch-qr?event_id=${event.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) { toast.error('Erreur téléchargement'); return }
+      if (!res.ok) { toast.error('Erreur telechargement'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = `QRCodes-${event.name}.zip`; a.click()
       URL.revokeObjectURL(url)
-    } catch { toast.error('Erreur réseau') }
+    } catch { toast.error('Erreur reseau') }
     finally { setDownloading(false) }
   }
 
@@ -130,13 +137,13 @@ export default function OrganizerGuestsPage() {
       const res = await fetch(`/api/events/${event.id}/invitation?all=true&template=${template}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) { toast.error('Erreur génération PDF'); return }
+      if (!res.ok) { toast.error('Erreur generation PDF'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = `Invitations-${event.name}.zip`; a.click()
       URL.revokeObjectURL(url)
-    } catch { toast.error('Erreur réseau') }
+    } catch { toast.error('Erreur reseau') }
     finally { setDownloadingInv(false) }
   }
 
@@ -154,13 +161,13 @@ export default function OrganizerGuestsPage() {
       const a = document.createElement('a')
       a.href = url; a.download = `Presences-${event.name}.xlsx`; a.click()
       URL.revokeObjectURL(url)
-    } catch { toast.error('Erreur réseau') }
+    } catch { toast.error('Erreur reseau') }
   }
 
   const sendWhatsAppAll = async () => {
     if (!event) return
     const withPhone = guests.filter(g => g.phone)
-    if (withPhone.length === 0) { toast.error('Aucun invité avec numéro de téléphone'); return }
+    if (withPhone.length === 0) { toast.error('Aucun invite avec numero de telephone'); return }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const lines = withPhone.map(g => {
@@ -180,7 +187,6 @@ export default function OrganizerGuestsPage() {
     a.href = url; a.download = `WhatsApp-${event.name}.txt`; a.click()
     URL.revokeObjectURL(url)
 
-    // Marquer comme notifiés
     const token = await getToken()
     await Promise.allSettled(
       withPhone.map(g =>
@@ -197,13 +203,13 @@ export default function OrganizerGuestsPage() {
           : g
       )
     )
-    toast.success(`${withPhone.length} liens générés`)
+    toast.success(`${withPhone.length} liens generes`)
   }
 
   if (loading) return <Spin />
 
   const grouped = filtered.reduce<Record<string, Guest[]>>((acc, g) => {
-    const cat = g.category ?? 'Sans catégorie'
+    const cat = g.category ?? 'Sans categorie'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(g)
     return acc
@@ -211,29 +217,22 @@ export default function OrganizerGuestsPage() {
 
   return (
     <>
-      {/* Barre d'actions */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h1 className="text-xl font-bold">Invités ({guests.length})</h1>
+        <h1 className="text-xl font-bold">Invites ({guests.length})</h1>
         <div className="flex flex-wrap gap-2">
-          {/* QR ZIP */}
           <button onClick={downloadAllQR} disabled={downloading || guests.length === 0}
             className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             <span className="hidden sm:inline">ZIP QR</span>
           </button>
 
-          {/* Export Excel */}
           <div className="flex items-center gap-1">
-            <select
-              value={exportFilter}
-              onChange={e => setExportFilter(e.target.value as 'all' | 'present')}
+            <select value={exportFilter} onChange={e => setExportFilter(e.target.value as 'all' | 'present')}
               className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none">
               <option value="all">Tous</option>
-              <option value="present">Présents</option>
+              <option value="present">Presents</option>
             </select>
-            <select
-              value={exportSort}
-              onChange={e => setExportSort(e.target.value as 'name' | 'time')}
+            <select value={exportSort} onChange={e => setExportSort(e.target.value as 'name' | 'time')}
               className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none">
               <option value="name">Par nom</option>
               <option value="time">Par heure</option>
@@ -245,11 +244,8 @@ export default function OrganizerGuestsPage() {
             </button>
           </div>
 
-          {/* Invitations PDF */}
           <div className="flex items-center gap-1">
-            <select
-              value={template}
-              onChange={e => setTemplate(e.target.value as Template)}
+            <select value={template} onChange={e => setTemplate(e.target.value as Template)}
               className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none">
               <option value="corporate">Corporate</option>
               <option value="gala">Gala</option>
@@ -262,7 +258,6 @@ export default function OrganizerGuestsPage() {
             </button>
           </div>
 
-          {/* WhatsApp */}
           <button onClick={sendWhatsAppAll} disabled={guests.length === 0}
             className="border border-green-500 text-green-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors flex items-center gap-1">
             <MessageCircle className="w-4 h-4" />
@@ -280,7 +275,6 @@ export default function OrganizerGuestsPage() {
         </div>
       </div>
 
-      {/* Recherche + filtre */}
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -296,13 +290,13 @@ export default function OrganizerGuestsPage() {
               ? 'bg-orange-100 border-orange-400 text-orange-700'
               : 'border-gray-300 text-gray-600 hover:bg-gray-50'
           }`}>
-          Non notifiés
+          Non notifies
         </button>
       </div>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
-          {search || onlyUnnotified ? 'Aucun résultat' : 'Aucun invité — importez votre liste.'}
+          {search || onlyUnnotified ? 'Aucun resultat' : 'Aucun invite — importez votre liste.'}
         </div>
       ) : (
         <div className="space-y-4">
@@ -319,7 +313,7 @@ export default function OrganizerGuestsPage() {
                       <p className="text-sm font-medium truncate">{g.full_name}</p>
                       {g.invitation_sent_at && (
                         <span className="flex items-center gap-0.5 text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full font-medium">
-                          <CheckCircle2 className="w-3 h-3" /> Notifié
+                          <CheckCircle2 className="w-3 h-3" /> Notifie
                         </span>
                       )}
                     </div>
@@ -328,7 +322,7 @@ export default function OrganizerGuestsPage() {
                   <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       g.checked_in ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>{g.checked_in ? 'Présent' : 'Attente'}</span>
+                    }`}>{g.checked_in ? 'Present' : 'Attente'}</span>
                     <Link href={`/organizer/guests/${g.id}`}
                       className="text-blue-400 hover:text-blue-600 transition-colors p-1">
                       <Eye className="w-4 h-4" />
