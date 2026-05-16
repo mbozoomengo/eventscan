@@ -89,7 +89,6 @@ export default function OrganizerGuestsPage() {
     return session?.access_token ?? ''
   }, [])
 
-  // Valeurs dynamiques pour les chips
   const categories = useMemo(() => {
     const set = new Set(guests.map(g => g.category ?? 'Sans catégorie'))
     return Array.from(set).sort()
@@ -100,10 +99,8 @@ export default function OrganizerGuestsPage() {
     return Array.from(set).sort()
   }, [guests])
 
-  // Filtrage + tri 100% client
   const filtered = useMemo(() => {
     let list = guests
-
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(g =>
@@ -112,33 +109,21 @@ export default function OrganizerGuestsPage() {
         g.category?.toLowerCase().includes(q)
       )
     }
-
-    if (statusFilter === 'present') list = list.filter(g => g.checked_in)
-    else if (statusFilter === 'absent') list = list.filter(g => !g.checked_in)
+    if (statusFilter === 'present')    list = list.filter(g => g.checked_in)
+    else if (statusFilter === 'absent')     list = list.filter(g => !g.checked_in)
     else if (statusFilter === 'unnotified') list = list.filter(g => !g.invitation_sent_at)
-
-    if (categoryFilter !== 'all') {
-      list = list.filter(g => (g.category ?? 'Sans catégorie') === categoryFilter)
-    }
-
-    if (tableFilter !== 'all') {
-      list = list.filter(g => g.table_name === tableFilter)
-    }
-
-    // Tri
+    if (categoryFilter !== 'all') list = list.filter(g => (g.category ?? 'Sans catégorie') === categoryFilter)
+    if (tableFilter !== 'all')    list = list.filter(g => g.table_name === tableFilter)
     list = [...list].sort((a, b) => {
-      if (sortKey === 'name') return a.full_name.localeCompare(b.full_name)
+      if (sortKey === 'name')     return a.full_name.localeCompare(b.full_name)
       if (sortKey === 'arrival') {
         if (!a.checked_in_at) return 1
         if (!b.checked_in_at) return -1
         return new Date(a.checked_in_at).getTime() - new Date(b.checked_in_at).getTime()
       }
-      if (sortKey === 'category') {
-        return (a.category ?? '').localeCompare(b.category ?? '')
-      }
+      if (sortKey === 'category') return (a.category ?? '').localeCompare(b.category ?? '')
       return 0
     })
-
     return list
   }, [guests, search, statusFilter, categoryFilter, tableFilter, sortKey])
 
@@ -159,20 +144,14 @@ export default function OrganizerGuestsPage() {
   }
 
   const cancelCheckIn = async (guest: Guest) => {
-    // Optimistic update
-    setGuests(prev =>
-      prev.map(g => g.id === guest.id ? { ...g, checked_in: false, checked_in_at: null } : g)
-    )
+    setGuests(prev => prev.map(g => g.id === guest.id ? { ...g, checked_in: false, checked_in_at: null } : g))
     const token = await getToken()
     const res = await fetch(`/api/scan/${guest.id}/cancel`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) {
-      // Rollback
-      setGuests(prev =>
-        prev.map(g => g.id === guest.id ? { ...g, checked_in: true, checked_in_at: guest.checked_in_at ?? null } : g)
-      )
+      setGuests(prev => prev.map(g => g.id === guest.id ? { ...g, checked_in: true, checked_in_at: guest.checked_in_at ?? null } : g))
       const data = await res.json()
       toast.error(data.error || 'Erreur annulation')
       return
@@ -180,14 +159,13 @@ export default function OrganizerGuestsPage() {
     toast.success(`Check-in de ${guest.full_name} annulé`)
   }
 
+  // ---- téléchargements (3 actions distinctes, aucun doublon) ----
   const downloadAllQR = async () => {
     if (!event) return
     setDownloading(true)
     try {
       const token = await getToken()
-      const res = await fetch(`/api/guests/batch-qr?event_id=${event.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/guests/batch-qr?event_id=${event.id}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Erreur téléchargement'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -203,9 +181,7 @@ export default function OrganizerGuestsPage() {
     setDownloadingInv(true)
     try {
       const token = await getToken()
-      const res = await fetch(`/api/events/${event.id}/invitation?all=true&template=${template}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/events/${event.id}/invitation?all=true&template=${template}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Erreur génération PDF'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -220,10 +196,7 @@ export default function OrganizerGuestsPage() {
     if (!event) return
     try {
       const token = await getToken()
-      const res = await fetch(
-        `/api/events/${event.id}/export?filter=${exportFilter}&sort=${exportSort}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const res = await fetch(`/api/events/${event.id}/export?filter=${exportFilter}&sort=${exportSort}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { toast.error('Erreur export'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -237,50 +210,31 @@ export default function OrganizerGuestsPage() {
     if (!event) return
     const withPhone = guests.filter(g => g.phone)
     if (withPhone.length === 0) { toast.error('Aucun invité avec numéro de téléphone'); return }
-
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const lines = withPhone.map(g => {
       const qrUrl = `${origin}/api/guests/${g.id}/qr`
-      const msg = encodeURIComponent(
-        `Bonjour ${g.full_name},\nVoici votre invitation pour ${event.name}.\nQR code : ${qrUrl}`
-      )
+      const msg = encodeURIComponent(`Bonjour ${g.full_name},\nVoici votre invitation pour ${event.name}.\nQR code : ${qrUrl}`)
       const phone = g.phone!.replace(/\D/g, '')
       const fullPhone = phone.startsWith('237') ? phone : `237${phone}`
       return `https://wa.me/${fullPhone}?text=${msg}`
     })
-
-    const txt = lines.join('\n')
-    const blob = new Blob([txt], { type: 'text/plain' })
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `WhatsApp-${event.name}.txt`; a.click()
     URL.revokeObjectURL(url)
-
     const token = await getToken()
-    await Promise.allSettled(
-      withPhone.map(g =>
-        fetch(`/api/guests/${g.id}/invitation-sent`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      )
-    )
-    setGuests(prev =>
-      prev.map(g =>
-        withPhone.find(w => w.id === g.id)
-          ? { ...g, invitation_sent_at: new Date().toISOString() }
-          : g
-      )
-    )
+    await Promise.allSettled(withPhone.map(g => fetch(`/api/guests/${g.id}/invitation-sent`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })))
+    setGuests(prev => prev.map(g => withPhone.find(w => w.id === g.id) ? { ...g, invitation_sent_at: new Date().toISOString() } : g))
     toast.success(`${withPhone.length} liens générés`)
   }
 
   if (loading) return <Spin />
 
   const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
-    { key: 'all', label: 'Tous' },
-    { key: 'present', label: 'Présents' },
-    { key: 'absent', label: 'Absents' },
+    { key: 'all',        label: 'Tous' },
+    { key: 'present',    label: 'Présents' },
+    { key: 'absent',     label: 'Absents' },
     { key: 'unnotified', label: 'Non notifiés' },
   ]
 
@@ -293,16 +247,19 @@ export default function OrganizerGuestsPage() {
 
   return (
     <>
-      {/* Actions header */}
+      {/* ---- Barre d'actions ---- */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h1 className="text-xl font-bold">Invités ({guests.length})</h1>
         <div className="flex flex-wrap gap-2">
+
+          {/* QR codes ZIP */}
           <button onClick={downloadAllQR} disabled={downloading || guests.length === 0}
-            className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
+            className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50">
             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            <span className="hidden sm:inline">ZIP QR</span>
+            <span className="hidden sm:inline">QR codes</span>
           </button>
 
+          {/* Export Excel avec options */}
           <div className="flex items-center gap-1">
             <select value={exportFilter} onChange={e => setExportFilter(e.target.value as 'all' | 'present')}
               className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none">
@@ -315,12 +272,13 @@ export default function OrganizerGuestsPage() {
               <option value="time">Par heure</option>
             </select>
             <button onClick={exportExcel} disabled={guests.length === 0}
-              className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
+              className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50">
               <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">Excel</span>
             </button>
           </div>
 
+          {/* Invitations PDF avec choix template */}
           <div className="flex items-center gap-1">
             <select value={template} onChange={e => setTemplate(e.target.value as Template)}
               className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none">
@@ -329,12 +287,13 @@ export default function OrganizerGuestsPage() {
               <option value="associatif">Associatif</option>
             </select>
             <button onClick={downloadInvitations} disabled={downloadingInv || guests.length === 0}
-              className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-1">
+              className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50">
               {downloadingInv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               <span className="hidden sm:inline">Invitations</span>
             </button>
           </div>
 
+          {/* WhatsApp */}
           <button onClick={sendWhatsAppAll} disabled={guests.length === 0}
             className="border border-green-500 text-green-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors flex items-center gap-1">
             <MessageCircle className="w-4 h-4" />
@@ -342,75 +301,51 @@ export default function OrganizerGuestsPage() {
           </button>
 
           <Link href="/organizer/guests/import"
-            className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1">
+            className="btn-secondary text-sm flex items-center gap-1">
             <Upload className="w-4 h-4" /><span className="hidden sm:inline">Importer</span>
           </Link>
           <Link href="/organizer/guests/new"
-            className="bg-orange-500 text-white text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-1">
+            className="btn-primary text-sm flex items-center gap-1">
             <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ajouter</span>
           </Link>
         </div>
       </div>
 
-      {/* Barre recherche */}
+      {/* Recherche */}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-          placeholder="Rechercher..."
+          placeholder="Rechercher…"
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {/* Chips filtres statut */}
+      {/* Chips filtres */}
       <div className="flex flex-wrap gap-2 mb-2">
         {STATUS_FILTERS.map(f => (
-          <button
-            key={f.key}
-            onClick={() => setStatusFilter(f.key)}
+          <button key={f.key} onClick={() => setStatusFilter(f.key)}
             className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${
-              statusFilter === f.key
-                ? 'bg-orange-500 border-orange-500 text-white'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}>
-            {f.label}
-          </button>
+              statusFilter === f.key ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}>{f.label}</button>
         ))}
-
-        {/* Chips catégorie */}
         {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setCategoryFilter(prev => prev === cat ? 'all' : cat)}
+          <button key={cat} onClick={() => setCategoryFilter(prev => prev === cat ? 'all' : cat)}
             className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${
-              categoryFilter === cat
-                ? 'bg-blue-500 border-blue-500 text-white'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}>
-            {cat}
-          </button>
+              categoryFilter === cat ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}>{cat}</button>
         ))}
-
-        {/* Chips table */}
         {tables.map(table => (
-          <button
-            key={table}
-            onClick={() => setTableFilter(prev => prev === table ? 'all' : table)}
+          <button key={table} onClick={() => setTableFilter(prev => prev === table ? 'all' : table)}
             className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${
-              tableFilter === table
-                ? 'bg-purple-500 border-purple-500 text-white'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}>
-            {table}
-          </button>
+              tableFilter === table ? 'bg-purple-500 border-purple-500 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}>{table}</button>
         ))}
       </div>
 
       {/* Tri */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xs text-gray-500">Trier :</span>
-        <select
-          value={sortKey}
-          onChange={e => setSortKey(e.target.value as SortKey)}
+        <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
           className="border border-gray-300 rounded-lg text-xs px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-400">
           <option value="name">Alphabétique</option>
           <option value="arrival">Heure d'arrivée</option>
@@ -419,11 +354,11 @@ export default function OrganizerGuestsPage() {
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
+      {/* Liste */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
           {search || statusFilter !== 'all' || categoryFilter !== 'all' || tableFilter !== 'all'
-            ? 'Aucun résultat'
-            : 'Aucun invité — importez votre liste.'}
+            ? 'Aucun résultat' : 'Aucun invité — importez votre liste.'}
         </div>
       ) : (
         <div className="space-y-4">
@@ -446,28 +381,20 @@ export default function OrganizerGuestsPage() {
                     </div>
                     {g.table_name && <p className="text-xs text-gray-400">{g.table_name}</p>}
                     {g.checked_in && g.checked_in_at && (
-                      <p className="text-xs text-green-600">
-                        Arrivée : {new Date(g.checked_in_at).toLocaleTimeString('fr-FR')}
-                      </p>
+                      <p className="text-xs text-green-600">Arrivée : {new Date(g.checked_in_at).toLocaleTimeString('fr-FR')}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       g.checked_in ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>{g.checked_in ? 'Présent' : 'Attente'}</span>
-
-                    {/* Bouton annulation check-in — visible uniquement si présent */}
                     {g.checked_in && (
-                      <button
-                        onClick={() => cancelCheckIn(g)}
-                        title="Annuler le check-in"
+                      <button onClick={() => cancelCheckIn(g)} title="Annuler le check-in"
                         className="text-orange-400 hover:text-orange-600 transition-colors p-1">
                         <XCircle className="w-4 h-4" />
                       </button>
                     )}
-
-                    <Link href={`/organizer/guests/${g.id}`}
-                      className="text-blue-400 hover:text-blue-600 transition-colors p-1">
+                    <Link href={`/organizer/guests/${g.id}`} className="text-blue-400 hover:text-blue-600 transition-colors p-1">
                       <Eye className="w-4 h-4" />
                     </Link>
                     <button onClick={() => deleteGuest(g.id, g.full_name)}

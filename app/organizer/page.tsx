@@ -4,9 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Users, Upload, QrCode, Clock, Wifi, WifiOff, CheckCircle2, ChevronRight } from 'lucide-react'
-
-// ---- types ----------------------------------------------------------------
+import { Users, Upload, QrCode, Clock, CheckCircle2, ChevronRight } from 'lucide-react'
 
 interface EventRow {
   id: string
@@ -27,8 +25,6 @@ interface TeamEntryShape {
   events: EventRow
 }
 
-// ---- helpers --------------------------------------------------------------
-
 function getGreeting(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Bonjour'
@@ -45,14 +41,6 @@ function getEventStatus(dateStr: string): { label: string; cls: string } {
   return { label: 'Passé', cls: 'bg-gray-100 text-gray-500' }
 }
 
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map(w => w[0]?.toUpperCase() ?? '')
-    .join('')
-}
-
 function Spin() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -64,29 +52,14 @@ function Spin() {
   )
 }
 
-// ---- page -----------------------------------------------------------------
-
 export default function OrganizerDashboard() {
   const [event,       setEvent]       = useState<EventRow | null>(null)
   const [stats,       setStats]       = useState({ total: 0, checked: 0 })
   const [recentScans, setRecentScans] = useState<RecentScan[]>([])
   const [userName,    setUserName]    = useState('')
-  const [isOnline,    setIsOnline]    = useState(true)
   const [loading,     setLoading]     = useState(true)
   const router   = useRouter()
   const supabase = createClient()
-
-  // network status
-  useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine)
-    window.addEventListener('online',  update)
-    window.addEventListener('offline', update)
-    update()
-    return () => {
-      window.removeEventListener('online',  update)
-      window.removeEventListener('offline', update)
-    }
-  }, [])
 
   const loadRecentScans = useCallback(async (eventId: string) => {
     const { data } = await supabase
@@ -126,8 +99,6 @@ export default function OrganizerDashboard() {
         setLoading(false)
         return
       }
-
-      // Supabase infère events comme tableau — on passe par unknown
       const ev = (teamEntry as unknown as TeamEntryShape).events
       setEvent(ev)
 
@@ -144,7 +115,6 @@ export default function OrganizerDashboard() {
 
   if (loading) return <Spin />
 
-  // ---- empty state --------------------------------------------------------
   if (!event) return (
     <div className="min-h-[70vh] flex items-center justify-center">
       <div className="card p-10 text-center max-w-sm mx-auto">
@@ -168,34 +138,18 @@ export default function OrganizerDashboard() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
 
-      {/* ---- offline banner ------------------------------------------------ */}
-      {!isOnline && (
-        <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-sm font-medium px-4 py-2.5 rounded-xl">
-          <WifiOff className="w-4 h-4 flex-shrink-0" />
-          Mode hors-ligne — les données affichées peuvent ne pas être à jour.
-        </div>
-      )}
-      {isOnline && (
-        <div className="flex items-center gap-2 text-green-600 text-xs">
-          <Wifi className="w-3.5 h-3.5" /> Connexion active
-        </div>
-      )}
-
-      {/* ---- header -------------------------------------------------------- */}
-      <div className="card p-5 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-base">{initials(userName)}</span>
-        </div>
-        <div className="flex-1 min-w-0">
+      {/* Header — nom en texte, pas de cercle */}
+      <div className="card p-5 flex items-center justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs text-gray-400">{getGreeting()}</p>
-          <p className="font-bold text-gray-900 truncate">{userName}</p>
+          <p className="font-bold text-lg text-gray-900 truncate">{userName}</p>
         </div>
         <Link href="/organizer/scan" className="btn-primary text-sm flex items-center gap-1.5 flex-shrink-0">
           <QrCode className="w-4 h-4" /> Scanner
         </Link>
       </div>
 
-      {/* ---- event card ---------------------------------------------------- */}
+      {/* Event card */}
       <div className="card p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -211,7 +165,7 @@ export default function OrganizerDashboard() {
         </div>
       </div>
 
-      {/* ---- stats cards --------------------------------------------------- */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="card p-5">
           <div className="flex items-center gap-2 mb-1">
@@ -233,7 +187,7 @@ export default function OrganizerDashboard() {
         </div>
       </div>
 
-      {/* ---- progress bar -------------------------------------------------- */}
+      {/* Progress */}
       <div className="card p-5">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-600 font-medium">Progression des entrées</span>
@@ -250,7 +204,7 @@ export default function OrganizerDashboard() {
         <p className="text-right text-xs text-gray-400 mt-1.5">{pct}%</p>
       </div>
 
-      {/* ---- quick actions ------------------------------------------------- */}
+      {/* Quick actions */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Accès rapides</h2>
 
@@ -303,7 +257,7 @@ export default function OrganizerDashboard() {
         </Link>
       </div>
 
-      {/* ---- recent check-ins --------------------------------------------- */}
+      {/* Recent check-ins */}
       {recentScans.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -332,7 +286,6 @@ export default function OrganizerDashboard() {
           </div>
         </div>
       )}
-
     </div>
   )
 }

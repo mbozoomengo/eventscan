@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Camera, CameraOff, XCircle, Wifi, WifiOff, Search, Clock } from 'lucide-react'
+import { Camera, CameraOff, XCircle, Clock } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNetworkStatus } from '@/lib/hooks/useNetworkStatus'
 import { loadCache, scanOffline, syncPending, CachedGuest } from '@/lib/hooks/useOfflineSync'
@@ -27,7 +27,6 @@ const OVERLAY_CONFIG: Record<ScanStatus, { color: string; label: string }> = {
   invalid:         { color: 'bg-orange-500', label: 'QR invalide' },
 }
 
-// Sons via Web Audio API — AudioContext instancié une seule fois en ref
 function createBeeper(): (frequency: number, durationMs: number) => void {
   let ctx: AudioContext | null = null
   return (frequency: number, durationMs: number) => {
@@ -43,9 +42,7 @@ function createBeeper(): (frequency: number, durationMs: number) => void {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000)
       osc.start(ctx.currentTime)
       osc.stop(ctx.currentTime + durationMs / 1000)
-    } catch {
-      // AudioContext indisponible
-    }
+    } catch { /* AudioContext indisponible */ }
   }
 }
 
@@ -56,30 +53,21 @@ function vibrate(pattern: number | number[]) {
 }
 
 export default function ScannerPage() {
-  const [event, setEvent] = useState<{ id: string; name: string; date: string } | null>(null)
+  const [event,   setEvent]   = useState<{ id: string; name: string; date: string } | null>(null)
   const [scanning, setScanning] = useState(false)
-  const [overlay, setOverlay] = useState<ScanResult | null>(null)
-  const [stats, setStats] = useState({ total: 0, checked: 0 })
-  const [blocked, setBlocked] = useState(false)
+  const [overlay,  setOverlay]  = useState<ScanResult | null>(null)
+  const [stats,    setStats]    = useState({ total: 0, checked: 0 })
+  const [blocked,  setBlocked]  = useState(false)
 
-  // Recherche manuelle
-  const [showManual, setShowManual] = useState(false)
-  const [manualQuery, setManualQuery] = useState('')
-  const [manualResults, setManualResults] = useState<CachedGuest[]>([])
-  const [manualLoading, setManualLoading] = useState(false)
-
-  const scannerRef = useRef<Html5Qrcode | null>(null)
-  const cooldown = useRef(false)
+  const scannerRef  = useRef<Html5Qrcode | null>(null)
+  const cooldown    = useRef(false)
   const sessionToken = useRef<string>('')
-  // AudioContext singleton
-  const beep = useRef(createBeeper())
-  // Cache des guests (pour la recherche manuelle)
+  const beep        = useRef(createBeeper())
   const guestsCache = useRef<CachedGuest[]>([])
-  // Historique des 5 derniers scans — ref pour ne pas re-render la caméra
   const recentScans = useRef<RecentScan[]>([])
   const [recentScansDisplay, setRecentScansDisplay] = useState<RecentScan[]>([])
 
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
   const { isOnline, pendingCount } = useNetworkStatus()
 
@@ -112,7 +100,7 @@ export default function ScannerPage() {
       if (!teamEntry) { toast.error('Aucun événement assigné'); return }
       if (teamEntry.is_blocked) { setBlocked(true); return }
 
-      const ev = (teamEntry as any).events as { id: string; name: string; date: string }
+      const ev = (teamEntry as { event_id: string; is_blocked: boolean; events: { id: string; name: string; date: string } }).events
       setEvent(ev)
       refreshStats(ev.id)
 
@@ -147,7 +135,6 @@ export default function ScannerPage() {
   const showOverlay = useCallback((result: ScanResult) => {
     setOverlay(result)
     const { status } = result
-
     if (status === 'success') {
       beep.current(880, 200)
       vibrate(200)
@@ -155,7 +142,6 @@ export default function ScannerPage() {
       beep.current(220, 400)
       vibrate([100, 50, 100])
     }
-
     if (result.guest) {
       pushRecentScan({
         name: result.guest.full_name,
@@ -163,7 +149,6 @@ export default function ScannerPage() {
         time: new Date().toLocaleTimeString('fr-FR'),
       })
     }
-
     setTimeout(() => {
       setOverlay(null)
       cooldown.current = false
@@ -222,27 +207,6 @@ export default function ScannerPage() {
     setScanning(false)
   }, [])
 
-  // Recherche manuelle dans le cache IndexedDB
-  const handleManualSearch = useCallback((q: string) => {
-    setManualQuery(q)
-    if (!q.trim()) { setManualResults([]); return }
-    const lower = q.toLowerCase()
-    const results = guestsCache.current
-      .filter(g => g.full_name.toLowerCase().includes(lower))
-      .slice(0, 10)
-    setManualResults(results)
-  }, [])
-
-  const handleManualCheckIn = useCallback(async (guest: CachedGuest) => {
-    setManualLoading(true)
-    // Même logique que scan QR — on utilise le qr_token du guest
-    await handleScan(guest.qr_token)
-    setManualResults([])
-    setManualQuery('')
-    setShowManual(false)
-    setManualLoading(false)
-  }, [handleScan])
-
   if (blocked) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="bg-red-900/30 border border-red-600 rounded-xl p-8 text-center max-w-sm">
@@ -257,17 +221,7 @@ export default function ScannerPage() {
   const overlayCfg = overlay ? OVERLAY_CONFIG[overlay.status] : null
 
   return (
-    <div className="space-y-4 relative">
-
-      {/* Bandeau réseau */}
-      <div className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 py-1.5 text-sm font-medium ${
-        isOnline ? 'bg-green-600 text-white' : 'bg-orange-500 text-white'
-      }`}>
-        {isOnline
-          ? <><Wifi className="w-4 h-4" /> En ligne</>
-          : <><WifiOff className="w-4 h-4" /> Hors-ligne{pendingCount > 0 ? ` — ${pendingCount} en attente` : ''}</>
-        }
-      </div>
+    <div className="space-y-4">
 
       {/* Overlay plein écran post-scan */}
       {overlay && overlayCfg && (
@@ -283,113 +237,71 @@ export default function ScannerPage() {
         </div>
       )}
 
-      <div className="pt-8">
-        {event && (
-          <div className="text-center">
-            <p className="font-semibold">{event.name}</p>
-            <p className="text-sm text-gray-400">{stats.checked}/{stats.total} entrées</p>
-          </div>
-        )}
+      {event && (
+        <div className="text-center">
+          <p className="font-semibold">{event.name}</p>
+          <p className="text-sm text-gray-400">{stats.checked}/{stats.total} entrées</p>
+        </div>
+      )}
 
-        <div id="qr-reader-scanner" className="rounded-xl overflow-hidden bg-gray-800" />
+      <div id="qr-reader-scanner" className="rounded-xl overflow-hidden bg-gray-800" />
 
-        {!scanning ? (
-          <div className="bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl p-10 text-center">
-            <Camera className="w-14 h-14 text-gray-500 mx-auto mb-4" />
-            <button
-              onClick={startScanner}
-              className="bg-orange-500 text-white font-medium px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto">
-              <Camera className="w-4 h-4" /> Activer la caméra
-            </button>
-          </div>
-        ) : (
+      {!scanning ? (
+        <div className="bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl p-10 text-center">
+          <Camera className="w-14 h-14 text-gray-500 mx-auto mb-4" />
           <button
-            onClick={stopScanner}
-            className="w-full bg-gray-700 text-gray-300 text-sm font-medium py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
-            <CameraOff className="w-4 h-4" /> Arrêter
+            onClick={startScanner}
+            className="bg-orange-500 text-white font-medium px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto">
+            <Camera className="w-4 h-4" /> Activer la caméra
           </button>
-        )}
-
-        {/* Bouton recherche manuelle */}
+        </div>
+      ) : (
         <button
-          onClick={() => setShowManual(v => !v)}
-          className="w-full bg-gray-800 border border-gray-600 text-gray-300 text-sm font-medium py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2">
-          <Search className="w-4 h-4" /> Recherche manuelle
+          onClick={stopScanner}
+          className="w-full bg-gray-700 text-gray-300 text-sm font-medium py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
+          <CameraOff className="w-4 h-4" /> Arrêter
         </button>
+      )}
 
-        {/* Panel recherche manuelle */}
-        {showManual && (
-          <div className="bg-gray-800 border border-gray-600 rounded-xl p-3 space-y-2">
-            <input
-              type="text"
-              value={manualQuery}
-              onChange={e => handleManualSearch(e.target.value)}
-              placeholder="Nom de l'invité..."
-              className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              autoFocus
-            />
-            {manualResults.length > 0 && (
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {manualResults.map(g => (
-                  <button
-                    key={g.id}
-                    onClick={() => handleManualCheckIn(g)}
-                    disabled={manualLoading}
-                    className="w-full text-left bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg px-3 py-2 transition-colors disabled:opacity-50">
-                    <p className="text-sm font-medium text-white">{g.full_name}</p>
-                    {g.category && <p className="text-xs text-gray-400">{g.category}</p>}
-                    {g.checked_in && <p className="text-xs text-orange-400">Déjà enregistré</p>}
-                  </button>
-                ))}
-              </div>
-            )}
-            {manualQuery.length > 0 && manualResults.length === 0 && (
-              <p className="text-xs text-gray-500 text-center py-2">Aucun résultat</p>
-            )}
+      {stats.total > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-400">Progression</span>
+            <span className="text-green-400 font-medium">{pct}%</span>
           </div>
-        )}
-
-        {stats.total > 0 && (
-          <div className="bg-gray-800 rounded-xl p-4">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-400">Progression</span>
-              <span className="text-green-400 font-medium">{pct}%</span>
-            </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
-              <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-            </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Historique des 5 derniers scans */}
-        {recentScansDisplay.length > 0 && (
-          <div className="bg-gray-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-400 font-medium">Derniers scans</span>
-            </div>
-            <div className="space-y-1">
-              {recentScansDisplay.map((s, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <span className="text-sm text-white truncate flex-1">{s.name}</span>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      s.status === 'success'
-                        ? 'bg-green-900/50 text-green-400'
-                        : s.status === 'already_scanned'
-                        ? 'bg-red-900/50 text-red-400'
-                        : 'bg-orange-900/50 text-orange-400'
-                    }`}>
-                      {s.status === 'success' ? '✓' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
-                    </span>
-                    <span className="text-xs text-gray-500">{s.time}</span>
-                  </div>
+      {recentScansDisplay.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span className="text-xs text-gray-400 font-medium">Derniers scans</span>
+          </div>
+          <div className="space-y-1">
+            {recentScansDisplay.map((s, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <span className="text-sm text-white truncate flex-1">{s.name}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    s.status === 'success'
+                      ? 'bg-green-900/50 text-green-400'
+                      : s.status === 'already_scanned'
+                      ? 'bg-red-900/50 text-red-400'
+                      : 'bg-orange-900/50 text-orange-400'
+                  }`}>
+                    {s.status === 'success' ? '✓' : s.status === 'already_scanned' ? 'Doublon' : 'Invalide'}
+                  </span>
+                  <span className="text-xs text-gray-500">{s.time}</span>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

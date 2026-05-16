@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { UserPlus, Loader2, X } from 'lucide-react'
+import { UserPlus, Loader2, X, ShieldOff, ShieldCheck, Users } from 'lucide-react'
 
 function Spin() {
   return (
@@ -13,25 +13,43 @@ function Spin() {
   )
 }
 
+interface TeamMember {
+  id: string
+  user_id: string
+  is_blocked: boolean
+  profiles: { id: string; full_name: string | null; email: string } | null
+}
+
+interface Scanner {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface EventShape {
+  id: string
+  name: string
+}
+
 export default function OrganizerTeamPage() {
-  const [team, setTeam] = useState<any[]>([])
-  const [available, setAvailable] = useState<any[]>([])
+  const [team,            setTeam]            = useState<TeamMember[]>([])
+  const [available,       setAvailable]       = useState<Scanner[]>([])
   const [selectedScanner, setSelectedScanner] = useState('')
-  const [event, setEvent] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [removingId, setRemovingId] = useState<string | null>(null)
-  const router = useRouter()
+  const [event,           setEvent]           = useState<EventShape | null>(null)
+  const [loading,         setLoading]         = useState(true)
+  const [saving,          setSaving]          = useState(false)
+  const [removingId,      setRemovingId]      = useState<string | null>(null)
+  const router   = useRouter()
   const supabase = createClient()
 
   const loadTeam = async (evId: string) => {
     const [{ data: teamData }, { data: allScanners }] = await Promise.all([
-      supabase.from('event_team').select('*, profiles(id, full_name, email)').eq('event_id', evId).eq('role', 'scanner'),
+      supabase.from('event_team').select('id, user_id, is_blocked, profiles(id, full_name, email)').eq('event_id', evId).eq('role', 'scanner'),
       supabase.from('profiles').select('id, full_name, email').eq('role', 'scanner'),
     ])
-    const inTeam = new Set((teamData ?? []).map((t: any) => t.user_id))
-    setTeam(teamData ?? [])
-    setAvailable((allScanners ?? []).filter((s: any) => !inTeam.has(s.id)))
+    const inTeam = new Set((teamData ?? []).map((t: TeamMember) => t.user_id))
+    setTeam((teamData as unknown as TeamMember[]) ?? [])
+    setAvailable(((allScanners as unknown as Scanner[]) ?? []).filter(s => !inTeam.has(s.id)))
   }
 
   useEffect(() => {
@@ -43,7 +61,7 @@ export default function OrganizerTeamPage() {
       const { data: teamEntry } = await supabase
         .from('event_team').select('event_id, events(id, name)').eq('user_id', user.id).eq('role', 'organizer').single()
       if (!teamEntry) { router.replace('/organizer'); return }
-      const ev = (teamEntry as any).events
+      const ev = (teamEntry as unknown as { event_id: string; events: EventShape }).events
       setEvent(ev)
       await loadTeam(ev.id)
       setLoading(false)
@@ -61,7 +79,7 @@ export default function OrganizerTeamPage() {
     })
     if (res.ok) {
       toast.success(!currentlyBlocked ? 'Scanner bloqué' : 'Scanner débloqué')
-      await loadTeam(event.id)
+      if (event) await loadTeam(event.id)
     } else {
       toast.error('Erreur')
     }
@@ -69,7 +87,7 @@ export default function OrganizerTeamPage() {
   }
 
   const removeScanner = async (teamId: string) => {
-    if (!window.confirm('Retirer ce scanner de l\'équipe ?')) return
+    if (!window.confirm("Retirer ce scanner de l'équipe ?")) return
     setRemovingId(teamId)
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/admin/assign-team', {
@@ -79,7 +97,7 @@ export default function OrganizerTeamPage() {
     })
     if (res.ok) {
       toast.success('Scanner retiré')
-      await loadTeam(event.id)
+      if (event) await loadTeam(event.id)
     } else {
       toast.error('Erreur lors du retrait')
     }
@@ -102,7 +120,7 @@ export default function OrganizerTeamPage() {
       await loadTeam(event.id)
     } else {
       const data = await res.json()
-      toast.error(data.error || 'Erreur lors de l\'ajout')
+      toast.error(data.error || "Erreur lors de l'ajout")
     }
     setSaving(false)
   }
@@ -110,86 +128,110 @@ export default function OrganizerTeamPage() {
   if (loading) return <Spin />
 
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold">Équipe ({team.length}/10 scanners)</h1>
-        <p className="text-sm text-gray-500">{event?.name}</p>
-      </div>
+    <div className="max-w-2xl mx-auto space-y-6 pb-10">
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm mb-6">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              {['Scanner', 'Email', 'Statut', 'Actions'].map(h => (
-                <th key={h} className="text-left px-4 py-2 text-xs text-gray-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {team.map((t: any) => (
-              <tr key={t.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{(t.profiles as any)?.full_name || '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{(t.profiles as any)?.email}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    t.is_blocked ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'
-                  }`}>
-                    {t.is_blocked ? 'Bloqué' : 'Actif'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleBlock(t.id, t.is_blocked)}
-                      disabled={saving}
-                      className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${
-                        t.is_blocked
-                          ? 'border-green-300 text-green-600 hover:bg-green-50'
-                          : 'border-red-300 text-red-500 hover:bg-red-50'
-                      }`}>
-                      {t.is_blocked ? 'Débloquer' : 'Bloquer'}
-                    </button>
-                    <button
-                      onClick={() => removeScanner(t.id)}
-                      disabled={removingId === t.id}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1">
-                      {removingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {team.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">
-                  Aucun scanner assigné
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {team.length < 10 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <h2 className="font-medium mb-3">Ajouter un scanner</h2>
-          <div className="flex gap-2">
-            <select
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              value={selectedScanner} onChange={e => setSelectedScanner(e.target.value)}>
-              <option value="">— Sélectionner un scanner —</option>
-              {available.map(s => (
-                <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>
-              ))}
-            </select>
-            <button onClick={addScanner} disabled={!selectedScanner || saving}
-              className="bg-orange-500 text-white text-sm font-medium px-3 py-2 rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors flex items-center gap-1">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-              Ajouter
-            </button>
+      {/* Header */}
+      <div className="card p-5">
+        <div className="flex items-center gap-3">
+          <span className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+            <Users className="w-5 h-5 text-orange-600" />
+          </span>
+          <div>
+            <h1 className="font-bold text-lg text-gray-900">Équipe scanners</h1>
+            <p className="text-sm text-gray-500">{event?.name} · {team.length}/10 scanners</p>
           </div>
         </div>
+      </div>
+
+      {/* Team list — cards responsive */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Membres actifs</h2>
+
+        {team.length === 0 ? (
+          <div className="card p-10 text-center">
+            <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">Aucun scanner assigné</p>
+          </div>
+        ) : (
+          team.map(t => (
+            <div key={t.id} className="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              {/* Avatar initiales */}
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 text-sm font-bold text-gray-500">
+                {(t.profiles?.full_name ?? t.profiles?.email ?? '?')[0]?.toUpperCase()}
+              </div>
+
+              {/* Infos */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 truncate">
+                  {t.profiles?.full_name ?? '—'}
+                </p>
+                <p className="text-xs text-gray-400 truncate">{t.profiles?.email}</p>
+              </div>
+
+              {/* Badge statut */}
+              <span className={`self-start sm:self-auto text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                t.is_blocked ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'
+              }`}>
+                {t.is_blocked ? 'Bloqué' : 'Actif'}
+              </span>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => toggleBlock(t.id, t.is_blocked)}
+                  disabled={saving}
+                  title={t.is_blocked ? 'Débloquer' : 'Bloquer'}
+                  className={`p-2 rounded-lg border transition-colors disabled:opacity-50 ${
+                    t.is_blocked
+                      ? 'border-green-200 text-green-600 hover:bg-green-50'
+                      : 'border-red-200 text-red-500 hover:bg-red-50'
+                  }`}>
+                  {t.is_blocked
+                    ? <ShieldCheck className="w-4 h-4" />
+                    : <ShieldOff  className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => removeScanner(t.id)}
+                  disabled={removingId === t.id}
+                  title="Retirer de l'équipe"
+                  className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50">
+                  {removingId === t.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <X className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Ajouter un scanner */}
+      {team.length < 10 && (
+        <div className="card p-5 space-y-3">
+          <h2 className="font-semibold text-gray-900">Ajouter un scanner</h2>
+          {available.length === 0 ? (
+            <p className="text-sm text-gray-400">Aucun scanner disponible.</p>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                value={selectedScanner} onChange={e => setSelectedScanner(e.target.value)}>
+                <option value="">— Sélectionner un scanner —</option>
+                {available.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name ? `${s.full_name} (${s.email})` : s.email}
+                  </option>
+                ))}
+              </select>
+              <button onClick={addScanner} disabled={!selectedScanner || saving}
+                className="btn-primary flex items-center justify-center gap-1.5 disabled:opacity-50">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Ajouter
+              </button>
+            </div>
+          )}
+        </div>
       )}
-    </>
+    </div>
   )
 }
