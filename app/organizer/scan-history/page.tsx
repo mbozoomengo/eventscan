@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -48,7 +48,6 @@ export default function ScanHistoryPage() {
   const [eventId, setEventId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
-  const eventIdRef = useRef<string | null>(null)
 
   const loadScans = useCallback(async (evId: string, silent = false) => {
     if (!silent) setRefreshing(true)
@@ -77,7 +76,6 @@ export default function ScanHistoryPage() {
 
       const evId = teamEntry.event_id
       setEventId(evId)
-      eventIdRef.current = evId
       await loadScans(evId)
       setLoading(false)
 

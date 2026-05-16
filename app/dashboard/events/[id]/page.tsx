@@ -183,10 +183,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const slots = buildSlots(guests)
 
-  const shareOnWhatsApp = (guestId: string, guestName: string) => {
+  const shareOnWhatsApp = (guestId: string) => {
     const qrUrl = `${SITE_URL}/api/guests/${guestId}/qr`
     const msg = encodeURIComponent(`Voici votre invitation QR code pour ${event.name} :\n${qrUrl}`)
-    void guestName
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
 
@@ -289,7 +288,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <QrCode className="w-3.5 h-3.5" /> QR
                     </a>
                     <button
-                      onClick={() => shareOnWhatsApp(g.id, g.full_name)}
+                      onClick={() => shareOnWhatsApp(g.id)}
                       className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
                       title="Partager sur WhatsApp">
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
